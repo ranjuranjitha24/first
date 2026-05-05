@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🚀 HR Recruiter Pro — Full Stack Setup
 
 ## Prerequisites
@@ -54,3 +55,7 @@ hr-management-system/
 ├── frontend/   → React + Vite (port 5173)
 └── backend/    → Node + Express + MongoDB (port 5000)
 ```
+=======
+# first
+Flask-based student attendance tracking system with real-time login/logout capture and SQLite database. Supports 500+ students with cloud deployment.
+>>>>>>> a667ae8f90f7c92cb399d4dfd6e9f0b595cb1518
