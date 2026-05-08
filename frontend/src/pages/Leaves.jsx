@@ -29,8 +29,8 @@ export default function Leaves() {
     setLoading(true)
     try {
       const [leavesRes, balRes, statsRes] = await Promise.all([
-        getLeaves(),
-        !isHR ? getLeaveBalances() : Promise.resolve({ data: { data: null } }),
+        getLeaves(user.role === 'employee' ? { employee_id: user.employee_id } : {}),
+        !isHR ? getLeaveBalances(user.employee_id) : Promise.resolve({ data: { data: null } }),
         isHR ? getLeaveStats() : Promise.resolve({ data: { data: null } })
       ])
       setLeaves(leavesRes.data.data)
@@ -47,8 +47,9 @@ export default function Leaves() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (!user.employee_id) return showToast('User ID not found', 'danger')
     try {
-      await addLeave(form)
+      await addLeave({ ...form, employee_id: user.employee_id })
       showToast('✅ Leave request submitted!')
       setShowModal(false)
       setForm({ leave_type: 'Casual', from_date: '', to_date: '', reason: '', duration: 1 })
