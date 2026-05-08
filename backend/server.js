@@ -10,13 +10,36 @@ const app = express();
 connectDB();
 
 // Middleware
-app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
+app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:3000', process.env.FRONTEND_URL || '*'], credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // Routes
 app.use('/api/employees', require('./routes/employeeRoutes'));
 app.use('/api/interviews', require('./routes/interviewRoutes'));
+
+// Auth/Login Route
+app.post('/api/auth/login', async (req, res) => {
+  const { username, password } = req.body;
+  
+  // Basic validation
+  if (!username || !password) {
+    return res.status(401).json({ detail: "Invalid credentials" });
+  }
+
+  // Generate a base64 token just like the Python backend did
+  const payload = { username, role: 'hr' };
+  const token = Buffer.from(JSON.stringify(payload)).toString('base64');
+
+  res.json({ 
+    success: true, 
+    data: {
+      token,
+      username,
+      role: 'hr'
+    }
+  });
+});
 
 // Health check
 app.get('/api/health', (req, res) => {

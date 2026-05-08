@@ -2,13 +2,13 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 
 const allNavItems = [
-  { path: '/dashboard',  icon: '📊', label: 'Dashboard',   roles: ['hr', 'employee'] },
-  { path: '/employees',  icon: '👥', label: 'Employees',   roles: ['hr'] },
-  { path: '/interviews', icon: '📅', label: 'Interviews',  roles: ['hr', 'employee'] },
-  { path: '/jobs',       icon: '💼', label: 'Job Postings',roles: ['hr'] },
-  { path: '/candidates', icon: '🎯', label: 'Candidates',  roles: ['hr'] },
-  { path: '/leaves',     icon: '🌴', label: 'Leave Tracker',roles: ['hr', 'employee'] },
-  { path: '/reviews',    icon: '⭐', label: 'Reviews',     roles: ['hr', 'employee'] },
+  { path: '/dashboard',  icon: '📊', label: 'Dashboard',   roles: ['admin', 'hr', 'employee'] },
+  { path: '/employees',  icon: '👥', label: 'Employees',   roles: ['admin', 'hr'] },
+  { path: '/interviews', icon: '📅', label: 'Interviews',  roles: ['admin', 'hr', 'employee'] },
+  { path: '/jobs',       icon: '💼', label: 'Job Postings',roles: ['admin', 'hr'] },
+  { path: '/candidates', icon: '🎯', label: 'Candidates',  roles: ['admin', 'hr'] },
+  { path: '/leaves',     icon: '🌴', label: 'Leave Tracker',roles: ['admin', 'hr', 'employee'] },
+  { path: '/reviews',    icon: '⭐', label: 'Reviews',     roles: ['admin', 'hr', 'employee'] },
 ]
 
 export default function Sidebar() {
