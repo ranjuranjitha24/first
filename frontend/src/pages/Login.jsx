@@ -12,8 +12,21 @@ export default function Login() {
     e.preventDefault(); setLoading(true); setError('')
     try {
       const res = await loginUser(form)
-      localStorage.setItem('hr_token', res.data.data.token)
-      navigate('/dashboard')
+      const token = res.data.data.token;
+      localStorage.setItem('hr_token', token)
+      
+      const payload = JSON.parse(atob(token));
+      const role = payload.role || 'admin';
+      
+      if (role === 'admin' || role === 'hr') {
+        navigate('/admin/dashboard')
+      } else if (role === 'employee') {
+        navigate('/employee/dashboard')
+      } else if (role === 'candidate') {
+        navigate('/candidate/dashboard')
+      } else {
+        navigate('/dashboard')
+      }
     } catch(err) {
       setError(err.response?.data?.detail || 'Invalid credentials')
     } finally { setLoading(false) }

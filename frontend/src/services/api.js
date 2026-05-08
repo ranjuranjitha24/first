@@ -58,12 +58,40 @@ export const deleteCandidate  = (id)     => API.delete(`/candidates/${id}`)
 
 // ── LEAVES ──
 export const getLeaves    = (params) => API.get('/leaves/', { params })
+export const getLeaveBalances = ()    => API.get('/leaves/balances')
+export const getLeaveStats    = ()    => API.get('/leaves/stats')
 export const addLeave     = (data)   => API.post('/leaves/', data)
 export const updateLeave  = (id, data) => API.put(`/leaves/${id}`, data)
 export const deleteLeave  = (id)     => API.delete(`/leaves/${id}`)
 
 // ── REVIEWS ──
 export const getReviews   = (params) => API.get('/reviews/', { params })
+export const getReviewStats = (params) => API.get('/reviews/stats', { params })
 export const addReview    = (data)   => API.post('/reviews/', data)
 export const updateReview = (id, data) => API.put(`/reviews/${id}`, data)
 export const deleteReview = (id)     => API.delete(`/reviews/${id}`)
+// ── ATTENDANCE ──
+export const getAttendance      = (params) => API.get('/attendance/', { params })
+export const getAttendanceStats = (params) => API.get('/attendance/stats', { params })
+export const attendanceCheck    = (data)   => API.post('/attendance/check', data)
+// ── PAYROLL ──
+export const getPayroll      = (params) => API.get('/payroll/', { params })
+export const getPayrollStats = ()       => API.get('/payroll/stats')
+export const addPayroll      = (data)   => API.post('/payroll/', data)
+export const updatePayroll   = (id, data) => API.put(`/payroll/${id}`, data)
+// ── AI ASSISTANT ──
+export const analyzeResume   = (formData) => API.post('/ai/analyze', formData, {
+  headers: { 'Content-Type': 'multipart/form-data' }
+})
+
+// ── NOTIFICATIONS ──
+export const getNotifications = () => API.get('/notifications/')
+export const getUnreadCount   = () => API.get('/notifications/unread-count')
+export const markRead         = (id) => API.put(`/notifications/${id}/read`)
+export const markAllRead      = () => API.put('/notifications/read-all')
+
+// ── CANDIDATE PORTAL ──
+export const getPortalJobs     = () => API.get('/portal/jobs')
+export const applyForJob       = (data) => API.post('/portal/apply', data)
+export const getMyApplications = () => API.get('/portal/my-applications')
+export const getMyInterviews   = () => API.get('/portal/my-interviews')

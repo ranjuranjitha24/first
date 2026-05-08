@@ -1,166 +1,178 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useLocation } from 'react-router-dom'
 import { getCandidates, getPipelineStats, addCandidate, updateCandidate, deleteCandidate, getJobs } from '../services/api'
 
-const STAGES = ['Applied','Shortlisted','Interviewed','Hired','Rejected']
-const STAGE_COLORS = { Applied:'info', Shortlisted:'warning', Interviewed:'primary', Hired:'success', Rejected:'danger' }
+const STAGES = ['Applied', 'Shortlisted', 'Interviewed', 'Hired', 'Rejected']
+const STAGE_COLORS = { Applied: 'info', Shortlisted: 'warning', Interviewed: 'primary', Hired: 'success', Rejected: 'danger' }
 
 export default function Candidates() {
+  const location = useLocation()
+  const qParams = new URLSearchParams(location.search)
+  const initialSearch = qParams.get('search') || ''
+
   const [candidates, setCandidates] = useState([])
-  const [jobs, setJobs]             = useState([])
-  const [stats, setStats]           = useState({})
-  const [stageFilter, setStageFilter] = useState('')
-  const [showForm, setShowForm]     = useState(false)
-  const [loading, setLoading]       = useState(true)
-  const [toast, setToast]           = useState('')
-  const [form, setForm]             = useState({ name:'',email:'',phone:'',job_id:'',resume_link:'',stage:'Applied',notes:'' })
+  const [jobs, setJobs] = useState([])
+  const [stats, setStats] = useState({})
+  const [search, setSearch] = useState(initialSearch)
+  const [viewMode, setViewMode] = useState('pipeline') // 'pipeline' or 'table'
+  const [showModal, setShowModal] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [toast, setToast] = useState('')
+  const [form, setForm] = useState({ name: '', email: '', phone: '', job_id: '', resume_link: '', stage: 'Applied' })
 
-  const showToast = msg => { setToast(msg); setTimeout(()=>setToast(''),3000) }
+  const showToast = msg => { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
-  const fetchAll = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const [cr, jr, sr] = await Promise.all([
-        getCandidates(stageFilter ? {stage:stageFilter} : {}),
-        getJobs(),
-        getPipelineStats()
-      ])
-      setCandidates(cr.data.data); setJobs(jr.data.data); setStats(sr.data.data)
-    } catch(e){ console.error(e) } finally { setLoading(false) }
-  }, [stageFilter])
+      const [cr, jr, sr] = await Promise.all([getCandidates(), getJobs(), getPipelineStats()])
+      setCandidates(cr.data.data)
+      setJobs(jr.data.data)
+      setStats(sr.data.data)
+    } catch (e) { console.error(e) } finally { setLoading(false) }
+  }, [])
 
-  useEffect(()=>{ fetchAll() }, [fetchAll])
+  useEffect(() => { fetchData() }, [fetchData])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    try { await addCandidate(form); showToast('✅ Candidate added!'); setShowForm(false); fetchAll() }
-    catch(err){ showToast('❌ Error') }
+    try {
+      await addCandidate(form)
+      showToast('✅ Candidate added to pipeline!')
+      setShowModal(false)
+      fetchData()
+    } catch (err) { showToast('❌ Error') }
   }
 
-  const handleStage = async (id, stage) => {
-    try { await updateCandidate(id, {stage}); fetchAll() } catch(e){}
+  const handleStageChange = async (id, stage) => {
+    try {
+      await updateCandidate(id, { stage })
+      fetchData()
+    } catch (e) { }
   }
 
-  const handleDelete = async (id) => {
-    if(!confirm('Delete candidate?')) return
-    try { await deleteCandidate(id); fetchAll() } catch(e){}
-  }
+  const filtered = candidates.filter(c =>
+    c.name.toLowerCase().includes(search.toLowerCase()) ||
+    c.email.toLowerCase().includes(search.toLowerCase()) ||
+    (c.job_title && c.job_title.toLowerCase().includes(search.toLowerCase()))
+  )
+
+  const renderPipeline = () => (
+    <div className="pipeline-board">
+      {STAGES.map(stage => (
+        <div key={stage} className="pipeline-column">
+          <div className="pipeline-header">
+            <h4>{stage}</h4>
+            <span className="pipeline-count">{filtered.filter(c => c.stage === stage).length}</span>
+          </div>
+          <div className="pipeline-cards">
+            {filtered.filter(c => c.stage === stage).map(c => (
+              <div key={c._id} className="pipeline-card-item">
+                <div className="card-name" style={{ fontSize: 14 }}>{c.name}</div>
+                <div className="card-role" style={{ fontSize: 11, marginBottom: 8 }}>{c.job_title}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  {c.resume_link && <a href={c.resume_link} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: 'var(--primary)' }}>📄 Resume</a>}
+                  <select 
+                    className="status-select-mini" 
+                    value={c.stage} 
+                    onChange={e => handleStageChange(c._id, e.target.value)}
+                    style={{ fontSize: 10, padding: '2px 4px' }}
+                  >
+                    {STAGES.map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
 
   return (
-    <div className="page-content">
-      {toast && <div className="toast show success">{toast}</div>}
+    <div className="page-content page-fade-in">
+      {toast && <div className="toast show success" style={{ position: 'fixed', top: 24, right: 24, zIndex: 10001 }}>{toast}</div>}
+
       <div className="page-header">
-        <div><h1 className="page-title">🎯 Candidate Pipeline</h1><p className="page-sub">Track applicants through hiring stages</p></div>
-        <button className="btn-primary" onClick={()=>setShowForm(s=>!s)}>➕ Add Candidate</button>
-      </div>
-
-      {/* Pipeline Stats */}
-      <div className="pipeline-stats">
-        {STAGES.map(s=>(
-          <div key={s} className={`pipeline-stat ${STAGE_COLORS[s]}`} onClick={()=>setStageFilter(f=>f===s?'':s)}>
-            <div className="pipeline-count">{stats[s]||0}</div>
-            <div className="pipeline-label">{s}</div>
-          </div>
-        ))}
-      </div>
-
-      {showForm && (
-        <div className="card" style={{marginBottom:24}}>
-          <div className="card-header"><h3>Add Candidate</h3></div>
-
-          {/* ⚠️ No jobs warning */}
-          {jobs.length === 0 && (
-            <div style={{
-              margin:'12px 24px 0',padding:'12px 16px',
-              background:'#fef3c7',borderRadius:10,
-              display:'flex',alignItems:'center',gap:10,fontSize:13,color:'#92400e'
-            }}>
-              ⚠️ <span>No job postings found. <strong>Go to 💼 Job Postings page first</strong> to create jobs, then come back to add candidates.</span>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} style={{padding:'20px 24px'}}>
-            <div className="form-grid">
-              <div className="form-group">
-                <label>Name *</label>
-                <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="e.g. Rahul Kumar" required />
-              </div>
-              <div className="form-group">
-                <label>Email *</label>
-                <input type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} placeholder="rahul@email.com" required />
-              </div>
-              <div className="form-group">
-                <label>Phone</label>
-                <input value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} placeholder="+91 98765 43210" />
-              </div>
-              <div className="form-group">
-                <label>Applied For * {jobs.length===0 && <span style={{color:'#dc2626',fontWeight:400,textTransform:'none'}}>— Add jobs first!</span>}</label>
-                <select value={form.job_id} onChange={e=>setForm(f=>({...f,job_id:e.target.value}))} required disabled={jobs.length===0}>
-                  <option value="">{jobs.length===0 ? '⚠️ No jobs available — create jobs first' : 'Select Job Opening'}</option>
-                  {jobs.map(j=>(
-                    <option key={j._id} value={j._id}>
-                      {j.title} ({j.department} · {j.status})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Stage</label>
-                <select value={form.stage} onChange={e=>setForm(f=>({...f,stage:e.target.value}))}>
-                  {STAGES.map(s=><option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Resume Link</label>
-                <input type="url" value={form.resume_link} onChange={e=>setForm(f=>({...f,resume_link:e.target.value}))} placeholder="https://drive.google.com/..." />
-              </div>
-              <div className="form-group full-width">
-                <label>Notes</label>
-                <textarea value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} rows={2} placeholder="Any additional notes about the candidate..." />
-              </div>
-            </div>
-            <div className="form-actions">
-              <button type="button" className="btn-outline" onClick={()=>setShowForm(false)}>Cancel</button>
-              <button type="submit" className="btn-primary" disabled={jobs.length===0}>💾 Save Candidate</button>
-            </div>
-          </form>
+        <div>
+          <h1 className="page-title">🎯 Talent Pipeline</h1>
+          <p className="page-sub">Manage candidates across different hiring stages</p>
         </div>
-      )}
+        <div className="header-actions">
+          <div className="view-toggle">
+            <button className={viewMode === 'pipeline' ? 'active' : ''} onClick={() => setViewMode('pipeline')}>Pipeline</button>
+            <button className={viewMode === 'table' ? 'active' : ''} onClick={() => setViewMode('table')}>All List</button>
+          </div>
+          <button className="btn-primary" onClick={() => setShowModal(true)}>➕ Add Candidate</button>
+        </div>
+      </div>
 
-      <div className="card">
+      <div className="card" style={{ marginBottom: 24 }}>
         <div className="card-header">
-          <h3>Candidates {stageFilter && `— ${stageFilter}`}</h3>
+          <h3>Candidates</h3>
           <div className="filters">
-            <select className="filter-select" value={stageFilter} onChange={e=>setStageFilter(e.target.value)}>
-              <option value="">All Stages</option>{STAGES.map(s=><option key={s}>{s}</option>)}
-            </select>
+            <input className="filter-input" placeholder="🔍 Search pipeline..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
         </div>
-        {loading ? <div className="loading-state">⏳ Loading...</div> : (
-          candidates.length===0
-            ? <div className="empty-state"><div className="empty-icon">🎯</div><p>No candidates found.</p></div>
-            : <div className="table-wrapper">
+
+        {loading ? (
+          <div className="loading-state" style={{ padding: 60 }}>⏳ Loading talent database...</div>
+        ) : (
+          viewMode === 'pipeline' ? renderPipeline() : (
+            <div className="table-wrapper">
               <table className="emp-table">
-                <thead><tr><th>Name</th><th>Email</th><th>Applied For</th><th>Stage</th><th>Resume</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Name</th><th>Email</th><th>Job</th><th>Stage</th><th>Actions</th></tr></thead>
                 <tbody>
-                  {candidates.map(c=>(
+                  {filtered.map(c => (
                     <tr key={c._id}>
-                      <td><div className="emp-name-text">{c.name}</div><div className="emp-email-text">{c.phone}</div></td>
+                      <td><div className="emp-name-text">{c.name}</div></td>
                       <td>{c.email}</td>
                       <td><span className="role-badge">{c.job_title}</span></td>
                       <td>
-                        <select className="status-select" value={c.stage} onChange={e=>handleStage(c._id,e.target.value)}>
-                          {STAGES.map(s=><option key={s}>{s}</option>)}
+                        <span className={`status-badge ${STAGE_COLORS[c.stage]}`}>
+                          <span className="status-dot"></span>{c.stage}
+                        </span>
+                      </td>
+                      <td>
+                        <select className="status-select" value={c.stage} onChange={e => handleStageChange(c._id, e.target.value)}>
+                          {STAGES.map(s => <option key={s}>{s}</option>)}
                         </select>
                       </td>
-                      <td>{c.resume_link ? <a href={c.resume_link} target="_blank" rel="noreferrer" className="btn-join-meet">📄 View</a> : '—'}</td>
-                      <td><button className="btn-icon delete" onClick={()=>handleDelete(c._id)}>🗑️</button></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+          )
         )}
       </div>
+
+      {/* Add Candidate Modal */}
+      {showModal && (
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header"><h3>➕ Add Candidate</h3><button className="modal-close" onClick={() => setShowModal(false)}>✕</button></div>
+            <form onSubmit={handleSubmit} className="modal-body">
+              <div className="form-grid">
+                <div className="form-group"><label>Name *</label><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required /></div>
+                <div className="form-group"><label>Email *</label><input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required /></div>
+                <div className="form-group">
+                  <label>Job *</label>
+                  <select value={form.job_id} onChange={e => setForm({ ...form, job_id: e.target.value })} required>
+                    <option value="">Select Job...</option>
+                    {jobs.map(j => <option key={j._id} value={j._id}>{j.title}</option>)}
+                  </select>
+                </div>
+                <div className="form-group"><label>Resume Link</label><input value={form.resume_link} onChange={e => setForm({ ...form, resume_link: e.target.value })} /></div>
+              </div>
+              <div className="form-actions" style={{ marginTop: 24 }}>
+                <button type="button" className="btn-outline" onClick={() => setShowModal(false)}>Cancel</button>
+                <button type="submit" className="btn-primary">Add Candidate</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

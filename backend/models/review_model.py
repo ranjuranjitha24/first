@@ -1,16 +1,23 @@
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Optional, List
+
+class KPI(BaseModel):
+    name: str
+    score: int # 1-100
 
 class ReviewCreate(BaseModel):
     employee_id: str
-    period: str          # e.g. "Q1 2025"
+    period: str          # e.g. "April 2024"
     rating: int          # 1-5
-    performance: str     # "Excellent" | "Good" | "Average" | "Poor"
+    performance: str     # Excellent, Good, Average, Poor
     comments: str
-    goals_met: Optional[bool] = True
+    achievements: Optional[str] = ""
+    kpis: List[KPI] = []
+    promotion_recommendation: bool = False
 
 class ReviewUpdate(BaseModel):
     rating: Optional[int] = None
     performance: Optional[str] = None
     comments: Optional[str] = None
-    goals_met: Optional[bool] = None
+    achievements: Optional[str] = None
+    promotion_recommendation: Optional[bool] = None

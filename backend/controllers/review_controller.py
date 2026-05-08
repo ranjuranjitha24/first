@@ -1,43 +1,48 @@
 from bson import ObjectId
-from bson.errors import InvalidId
-from fastapi import HTTPException
 from config.db import reviews_col, employees_col
 from models.review_model import ReviewCreate, ReviewUpdate
-from datetime import datetime, timezone
+from fastapi import HTTPException
+from datetime import datetime
 
 def serialize(doc) -> dict:
-    if doc is None: return None
+    if not doc: return None
     doc["_id"] = str(doc["_id"])
-    try:
-        emp = employees_col.find_one({"_id": ObjectId(doc.get("employee_id", ""))})
-        doc["employee_name"] = emp.get("name", "Unknown") if emp else "Unknown"
-        doc["employee_role"] = emp.get("role", "") if emp else ""
-    except Exception:
-        doc["employee_name"] = "Unknown"; doc["employee_role"] = ""
+    if "employee_id" in doc and "employee_name" not in doc:
+        emp = employees_col.find_one({"_id": ObjectId(doc["employee_id"])})
+        doc["employee_name"] = emp["name"] if emp else "Unknown"
+        doc["employee_role"] = emp["role"] if emp else "N/A"
     return doc
 
-def get_all_reviews(employee_id: str = "") -> list:
+def get_all_reviews(employee_id: str = ""):
     query = {}
     if employee_id: query["employee_id"] = employee_id
-    return [serialize(d) for d in reviews_col.find(query).sort("createdAt", -1)]
+    docs = list(reviews_col.find(query).sort("period", -1))
+    return [serialize(d) for d in docs]
 
-def create_review(data: ReviewCreate) -> dict:
-    if not 1 <= data.rating <= 5:
-        raise HTTPException(400, "Rating must be between 1 and 5")
+def create_review(data: ReviewCreate):
     payload = data.model_dump()
-    payload["createdAt"] = datetime.now(timezone.utc).isoformat()
-    result = reviews_col.insert_one(payload)
-    return serialize(reviews_col.find_one({"_id": result.inserted_id}))
+    payload["createdAt"] = datetime.now().isoformat()
+    res = reviews_col.insert_one(payload)
+    return serialize(reviews_col.find_one({"_id": res.inserted_id}))
 
-def update_review(rid: str, data: ReviewUpdate) -> dict:
-    try: oid = ObjectId(rid)
-    except InvalidId: raise HTTPException(400, "Invalid review ID")
+def update_review(rid: str, data: ReviewUpdate):
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
-    reviews_col.update_one({"_id": oid}, {"$set": update_data})
-    return serialize(reviews_col.find_one({"_id": oid}))
+    reviews_col.update_one({"_id": ObjectId(rid)}, {"$set": update_data})
+    return serialize(reviews_col.find_one({"_id": ObjectId(rid)}))
 
-def delete_review(rid: str) -> dict:
-    try: oid = ObjectId(rid)
-    except InvalidId: raise HTTPException(400, "Invalid review ID")
-    reviews_col.delete_one({"_id": oid})
-    return {"message": "Review deleted"}
+def get_performance_stats(employee_id: str):
+    query = {"employee_id": employee_id}
+    docs = list(reviews_col.find(query).sort("period", 1))
+    
+    ratings_over_time = [{"period": d["period"], "rating": d["rating"]} for d in docs]
+    
+    # Latest KPIs for Radar Chart
+    latest = docs[-1] if docs else None
+    kpis = latest.get("kpis", []) if latest else []
+    
+    return {
+        "history": ratings_over_time,
+        "latest_kpis": kpis,
+        "avg_rating": sum(d["rating"] for d in docs)/len(docs) if docs else 0,
+        "recommendations": reviews_col.count_documents({**query, "promotion_recommendation": True})
+    }

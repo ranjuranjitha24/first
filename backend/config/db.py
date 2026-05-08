@@ -1,5 +1,4 @@
 import os
-import certifi
 from pymongo import MongoClient
 from dotenv import load_dotenv
 
@@ -19,3 +18,6 @@ leaves_col     = db["leaves"]
 reviews_col    = db["reviews"]
 users_col      = db["users"]
 activity_col   = db["activity"]
+attendance_col = db["attendance"]
+payroll_col    = db["payroll"]
+notifications_col = db["notifications"]

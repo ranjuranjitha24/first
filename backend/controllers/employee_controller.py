@@ -42,19 +42,29 @@ def create_employee(data: EmployeeCreate) -> dict:
     # Check duplicate email
     if employees_col.find_one({"email": data.email}):
         raise HTTPException(status_code=400, detail="Email already exists")
+    
     payload = data.model_dump()
+    # Remove auth fields from employee document
+    username = payload.pop("username", None)
+    password = payload.pop("password", None)
+    
     payload["createdAt"] = datetime.now(timezone.utc).isoformat()
     result = employees_col.insert_one(payload)
+    emp_id = str(result.inserted_id)
     
     # Auto-create user account for this employee
     from controllers.auth_controller import hash_pw
     from config.db import users_col
-    if not users_col.find_one({"username": data.email}):
+    
+    auth_username = username or data.email
+    auth_password = hash_pw(password or "welcome123")
+    
+    if not users_col.find_one({"username": auth_username}):
         users_col.insert_one({
-            "username": data.email,
-            "password": hash_pw("welcome123"),
+            "username": auth_username,
+            "password": auth_password,
             "role": "employee",
-            "employee_id": str(result.inserted_id)
+            "employee_id": emp_id
         })
 
     return serialize(employees_col.find_one({"_id": result.inserted_id}))
@@ -102,12 +112,27 @@ def delete_employee(emp_id: str) -> dict:
     return {"message": "Employee and their user account deleted"}
 
 
-def get_stats() -> dict:
+def get_stats(employee_id: str = "") -> dict:
+    query = {}
+    if employee_id:
+        query = {"employee": employee_id}
+        
+    total_interviews = interviews_col.count_documents(query)
+    scheduled        = interviews_col.count_documents({**query, "status": "Scheduled"})
+    completed        = interviews_col.count_documents({**query, "status": "Completed"})
+    cancelled        = interviews_col.count_documents({**query, "status": "Cancelled"})
+    
+    if employee_id:
+        # For employee, return their personal stats
+        return {
+            "totalInterviews": total_interviews,
+            "scheduled":       scheduled,
+            "completed":       completed,
+            "cancelled":       cancelled,
+            "totalEmployees": 1 # Just for dashboard fallback
+        }
+
     total_employees  = employees_col.count_documents({})
-    total_interviews = interviews_col.count_documents({})
-    scheduled        = interviews_col.count_documents({"status": "Scheduled"})
-    completed        = interviews_col.count_documents({"status": "Completed"})
-    cancelled        = interviews_col.count_documents({"status": "Cancelled"})
     return {
         "totalEmployees":  total_employees,
         "totalInterviews": total_interviews,
