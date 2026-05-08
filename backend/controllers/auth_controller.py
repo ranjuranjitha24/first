@@ -90,3 +90,12 @@ def seed_admin():
             "role": "candidate"
         })
         print("✅ Candidate created: candidate | candidate123")
+    
+    from config.db import candidates_col
+    if candidates_col.count_documents({}) == 0:
+        candidates_col.insert_many([
+            {"name": "Aditya Verma", "email": "aditya@example.com", "job_title": "Frontend Developer", "status": "Applied", "skills": "React, CSS"},
+            {"name": "Sneha Rao", "email": "sneha@example.com", "job_title": "Backend Developer", "status": "Shortlisted", "skills": "Python, FastAPI"},
+            {"name": "John Doe", "email": "john@example.com", "job_title": "UI/UX Designer", "status": "Interview", "skills": "Figma, Adobe XD"}
+        ])
+        print("✅ Sample candidates seeded")
