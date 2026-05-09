@@ -6,7 +6,7 @@ LEAVE_TYPES = Literal["Sick", "Casual", "Earned", "Unpaid", "Paternity", "Matern
 LEAVE_STATUS = Literal["Pending", "Approved", "Rejected"]
 
 class LeaveCreate(BaseModel):
-    employee_id: str
+    employee_id: Optional[str] = None
     leave_type: LEAVE_TYPES = "Casual"
     from_date: str   # YYYY-MM-DD
     to_date: str     # YYYY-MM-DD

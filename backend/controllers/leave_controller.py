@@ -6,13 +6,24 @@ from fastapi import HTTPException
 def serialize(doc) -> dict:
     if not doc: return None
     doc["_id"] = str(doc["_id"])
-    # Join employee name if missing
-    if "employee_id" in doc and "employee_name" not in doc:
+    
+    # Robustly join employee name and username
+    if "employee_id" in doc:
         try:
             emp = employees_col.find_one({"_id": ObjectId(doc["employee_id"])})
-            doc["employee_name"] = emp["name"] if emp else "Unknown"
+            if emp:
+                doc["employee_name"] = emp.get("name", "Unknown")
+                doc["employee_username"] = emp.get("username", "Unknown")
+            else:
+                # Fallback to users collection if not found in employees
+                from config.db import users_col
+                user_doc = users_col.find_one({"_id": ObjectId(doc["employee_id"])})
+                if user_doc:
+                    doc["employee_username"] = user_doc.get("username", "Unknown")
+                    doc["employee_name"] = user_doc.get("username", "Unknown")
         except:
-            doc["employee_name"] = "Unknown"
+            doc["employee_name"] = doc.get("employee_name", "Unknown")
+            doc["employee_username"] = doc.get("employee_username", "Unknown")
     return doc
 
 def get_leave_by_id(lid: str):
@@ -34,6 +45,7 @@ def create_leave(data: LeaveCreate):
     payload = data.model_dump()
     # In a real app, we'd check if balance > 0 here.
     res = leaves_col.insert_one(payload)
+    print(f"✅ Leave request created: {res.inserted_id} for Employee: {payload.get('employee_id')}")
     return serialize(leaves_col.find_one({"_id": res.inserted_id}))
 
 def update_leave(lid: str, data: LeaveUpdate):

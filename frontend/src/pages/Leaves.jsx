@@ -16,6 +16,7 @@ export default function Leaves() {
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' })
   const [form, setForm] = useState({ leave_type: 'Casual', from_date: '', to_date: '', reason: '', duration: 1 })
   const [reviewForm, setReviewForm] = useState({ status: 'Approved', manager_comment: '' })
+  const [isSaving, setIsSaving] = useState(false)
 
   const user = getCurrentUser() || {}
   const isHR = user.role !== 'employee'
@@ -29,7 +30,7 @@ export default function Leaves() {
     setLoading(true)
     try {
       const [leavesRes, balRes, statsRes] = await Promise.all([
-        getLeaves(user.role === 'employee' ? { employee_id: user.employee_id } : {}),
+        getLeaves(user.role === 'employee' ? {} : {}),
         !isHR ? getLeaveBalances() : Promise.resolve({ data: { data: null } }),
         isHR ? getLeaveStats() : Promise.resolve({ data: { data: null } })
       ])
@@ -48,6 +49,7 @@ export default function Leaves() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    setIsSaving(true)
     try {
       const res = await addLeave(form)
       if (res.data.success) {
@@ -59,7 +61,10 @@ export default function Leaves() {
         showToast(res.data.message || 'Failed to submit', 'danger')
       }
     } catch (err) { 
-      showToast('❌ Network error', 'danger') 
+      console.error('Leave Submission Error:', err.response?.data || err.message)
+      showToast(err.response?.data?.message || err.response?.data?.detail?.[0]?.msg || '❌ Submission failed', 'danger') 
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -163,8 +168,11 @@ export default function Leaves() {
                     <tr key={l._id}>
                       {isHR && <td>
                         <div className="emp-name-cell">
-                          <div className="avatar" style={{ background: `hsl(${l.employee_name.length * 40}, 70%, 50%)` }}>{l.employee_name[0]}</div>
-                          <div className="emp-name-text">{l.employee_name}</div>
+                          <div className="avatar" style={{ background: `hsl(${(l.employee_name || 'Unknown').length * 40}, 70%, 50%)` }}>{(l.employee_name || 'U')[0]}</div>
+                          <div>
+                            <div className="emp-name-text">{l.employee_name}</div>
+                            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>@{l.employee_username || 'unknown'}</div>
+                          </div>
                         </div>
                       </td>}
                       <td>
@@ -283,8 +291,10 @@ export default function Leaves() {
                 </div>
               </div>
               <div className="form-actions">
-                <button type="button" className="btn-outline" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn-primary">Submit Application</button>
+                <button type="button" className="btn-outline" onClick={() => setShowModal(false)} disabled={isSaving}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={isSaving}>
+                  {isSaving ? '⏳ Submitting...' : 'Submit Application'}
+                </button>
               </div>
             </form>
           </div>
@@ -305,10 +315,10 @@ export default function Leaves() {
             <form onSubmit={handleReview} style={{ padding: 24 }}>
               <div style={{ marginBottom: 24, padding: 20, background: 'var(--primary-glow)', borderRadius: 16, border: '1px solid var(--primary-light)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                  <div className="avatar" style={{ background: 'var(--primary)' }}>{reviewModal.employee_name[0]}</div>
+                  <div className="avatar" style={{ background: 'var(--primary)' }}>{(reviewModal?.employee_name || 'U')[0]}</div>
                   <div>
-                    <div style={{ fontWeight: 800 }}>{reviewModal.employee_name}</div>
-                    <div style={{ fontSize: 12, opacity: 0.8 }}>{reviewModal.leave_type} · {reviewModal.duration} Days</div>
+                    <div style={{ fontWeight: 800 }}>{reviewModal?.employee_name || 'Unknown Employee'}</div>
+                    <div style={{ fontSize: 12, opacity: 0.8 }}>{reviewModal?.leave_type} · {reviewModal?.duration} Days</div>
                   </div>
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', background: 'var(--bg-card)', padding: 12, borderRadius: 10 }}>
