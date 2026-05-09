@@ -4,32 +4,28 @@ import ThemeToggle from './ThemeToggle'
 import { getCurrentUser } from '../services/api'
 
 const allNavItems = [
-  // HR/Admin
-  { path: '/admin/dashboard', icon: '📊', label: 'Dashboard',       roles: ['admin', 'hr'] },
+  // Shared / Role-specific
+  { path: '/admin/dashboard',    icon: '📊', label: 'Dashboard',       roles: ['admin', 'hr'] },
+  { path: '/employee/dashboard', icon: '📊', label: 'Dashboard',       roles: ['employee'] },
+  { path: '/candidate/dashboard',icon: '📊', label: 'Dashboard',       roles: ['candidate'] },
+  
   { path: '/employees',       icon: '👥', label: 'Employees',       roles: ['admin', 'hr'] },
   { path: '/jobs',            icon: '💼', label: 'Job Postings',     roles: ['admin', 'hr'] },
-  { path: '/interviews',      icon: '📅', label: 'Interviews',      roles: ['admin', 'hr'] },
+  { path: '/leaves',          icon: '🌴', label: 'Leaves',          roles: ['admin', 'hr', 'employee'] },
+  { path: '/interviews',      icon: '📅', label: 'Interviews',      roles: ['admin', 'hr', 'employee', 'candidate'] },
+  { path: '/attendance',      icon: '⏰', label: 'Attendance',      roles: ['admin', 'hr', 'employee'] },
+  { path: '/meetings',        icon: '🤝', label: 'Meetings',         roles: ['admin', 'hr', 'employee'] },
+  { path: '/payroll',         icon: '💰', label: 'Payroll',         roles: ['admin', 'hr', 'employee'] },
   { path: '/analytics',       icon: '📈', label: 'Analytics',       roles: ['admin', 'hr'] },
-  { path: '/attendance',      icon: '⏰', label: 'Attendance',      roles: ['admin', 'hr'] },
-  { path: '/payroll',         icon: '💰', label: 'Payroll',         roles: ['admin', 'hr'] },
-  { path: '/leaves',          icon: '🌴', label: 'Leave Approvals', roles: ['admin', 'hr'] },
-  { path: '/meetings',        icon: '🤝', label: 'Meetings',         roles: ['admin', 'hr'] },
+  { path: '/reviews',         icon: '⭐', label: 'Reviews',        roles: ['employee'] },
+  
+  // Candidate Specific
+  { path: '/jobs/available',  icon: '🚀', label: 'Available Jobs',  roles: ['candidate'] },
+  { path: '/applications',    icon: '📝', label: 'Applied Jobs',    roles: ['candidate'] },
+  
+  // Shared Bottom
+  { path: '/profile',         icon: '👤', label: 'Profile',         roles: ['admin', 'hr', 'employee', 'candidate'] },
   { path: '/settings',        icon: '⚙️', label: 'Settings',       roles: ['admin', 'hr'] },
-
-  // Employee
-  { path: '/employee/dashboard', icon: '📊', label: 'Dashboard',      roles: ['employee'] },
-  { path: '/attendance',         icon: '⏰', label: 'Attendance',     roles: ['employee'] },
-  { path: '/leaves',             icon: '🌴', label: 'Leave Requests', roles: ['employee'] },
-  { path: '/meetings',           icon: '🤝', label: 'Meetings',         roles: ['employee'] },
-  { path: '/reviews',            icon: '⭐', label: 'Reviews',        roles: ['employee'] },
-  { path: '/profile',            icon: '👤', label: 'Profile',        roles: ['employee'] },
-
-  // Candidate
-  { path: '/candidate/dashboard', icon: '📊', label: 'Dashboard',       roles: ['candidate'] },
-  { path: '/jobs/available',      icon: '🚀', label: 'Available Jobs',  roles: ['candidate'] },
-  { path: '/applications',        icon: '📝', label: 'Applied Jobs',    roles: ['candidate'] },
-  { path: '/interviews',          icon: '📅', label: 'Interview Status',roles: ['candidate'] },
-  { path: '/profile',             icon: '👤', label: 'Profile',         roles: ['candidate'] },
 ]
 
 export default function Sidebar() {
