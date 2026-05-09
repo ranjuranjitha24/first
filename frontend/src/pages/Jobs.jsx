@@ -12,7 +12,11 @@ export default function Jobs() {
   const [editJob, setEditJob] = useState(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('Open')
-  const [form, setForm] = useState({ title: '', department: 'Engineering', type: 'Full-time', location: 'Remote', description: '', status: 'Open', salary_range: '' })
+  const [form, setForm] = useState({ 
+    title: '', department: 'Engineering', type: 'Full-time', 
+    location: 'Remote', description: '', status: 'Open', 
+    salary: '', requirements: '', required_skills: '', deadline: '' 
+  })
   const [toast, setToast] = useState('')
 
   const showToast = msg => { setToast(msg); setTimeout(() => setToast(''), 3000) }
@@ -42,14 +46,23 @@ export default function Jobs() {
       else await addJob(form)
       showToast(editJob ? '✅ Job updated!' : '✅ Job posted!')
       setShowModal(false); setEditJob(null)
-      setForm({ title: '', department: 'Engineering', type: 'Full-time', location: 'Remote', description: '', status: 'Open', salary_range: '' })
+      setForm({ 
+        title: '', department: 'Engineering', type: 'Full-time', 
+        location: 'Remote', description: '', status: 'Open', 
+        salary: '', requirements: '', required_skills: '', deadline: '' 
+      })
       fetchJobs()
     } catch (err) { showToast('❌ Error') }
   }
 
   const handleEdit = (job) => {
     setEditJob(job)
-    setForm({ title: job.title, department: job.department, type: job.type, location: job.location, description: job.description, status: job.status, salary_range: job.salary_range || '' })
+    setForm({ 
+      title: job.title, department: job.department, type: job.type, 
+      location: job.location, description: job.description, status: job.status, 
+      salary: job.salary || '', requirements: job.requirements || '',
+      required_skills: job.required_skills || '', deadline: job.deadline || ''
+    })
     setShowModal(true)
   }
 
@@ -95,22 +108,24 @@ export default function Jobs() {
                 <tr>
                   <th>Job Title</th>
                   <th>Department</th>
-                  <th>Type & Location</th>
-                  <th>Applicants</th>
+                  <th>Salary & Type</th>
+                  <th>Location</th>
+                  <th>Deadline</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  <tr><td colSpan="6" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>No job postings found</td></tr>
+                  <tr><td colSpan="7" style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>No job postings found</td></tr>
                 ) : (
                   filtered.map(j => (
                     <tr key={j._id}>
-                      <td><div className="emp-name-text">{j.title}</div><div className="emp-email-text">{j.salary_range || 'Competitive'}</div></td>
+                      <td><div className="emp-name-text">{j.title}</div><div className="emp-email-text" style={{ fontSize: 11 }}>{j.required_skills?.split(',')[0]}...</div></td>
                       <td><span className="role-badge">{j.department}</span></td>
-                      <td><div className="emp-email-text">{j.type} · {j.location}</div></td>
-                      <td><div className="pipeline-count" style={{ fontSize: 14, padding: '2px 8px' }}>{j.applicant_count || 0}</div></td>
+                      <td><div style={{ fontWeight: 700, color: 'var(--success)' }}>{j.salary || 'Negotiable'}</div><div className="emp-email-text">{j.type}</div></td>
+                      <td>{j.location}</td>
+                      <td>{j.deadline || 'No deadline'}</td>
                       <td><span className={`status-badge ${j.status === 'Open' ? 'success' : j.status === 'Closed' ? 'danger' : 'warning'}`}>{j.status}</span></td>
                       <td>
                         <div className="action-buttons">
@@ -130,7 +145,7 @@ export default function Jobs() {
       {/* Post/Edit Job Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 800 }}>
             <div className="modal-header">
               <h3>{editJob ? '✏️ Edit Job Posting' : '🚀 Post New Job Opening'}</h3>
               <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
@@ -151,14 +166,17 @@ export default function Jobs() {
                   </select>
                 </div>
                 <div className="form-group"><label>Location</label><input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="e.g. Remote / Bangalore" /></div>
-                <div className="form-group"><label>Salary Range</label><input value={form.salary_range} onChange={e => setForm({ ...form, salary_range: e.target.value })} placeholder="e.g. ₹15L - ₹25L" /></div>
+                <div className="form-group"><label>Salary Range</label><input value={form.salary} onChange={e => setForm({ ...form, salary: e.target.value })} placeholder="e.g. ₹15L - ₹25L" /></div>
                 <div className="form-group">
                   <label>Status</label>
                   <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
                     {JOB_STATUS.map(s => <option key={s}>{s}</option>)}
                   </select>
                 </div>
-                <div className="form-group full-width"><label>Description</label><textarea rows="4" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Job roles, requirements, and responsibilities..." required /></div>
+                <div className="form-group"><label>Application Deadline</label><input type="date" value={form.deadline} onChange={e => setForm({ ...form, deadline: e.target.value })} /></div>
+                <div className="form-group full-width"><label>Required Skills (comma separated)</label><input value={form.required_skills} onChange={e => setForm({ ...form, required_skills: e.target.value })} placeholder="React, Node.js, TypeScript..." /></div>
+                <div className="form-group full-width"><label>Key Requirements</label><textarea rows="3" value={form.requirements} onChange={e => setForm({ ...form, requirements: e.target.value })} placeholder="Experience, education, etc..." /></div>
+                <div className="form-group full-width"><label>Job Description</label><textarea rows="4" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Job roles and responsibilities..." required /></div>
               </div>
               <div className="form-actions" style={{ marginTop: 20 }}>
                 <button type="button" className="btn-outline" onClick={() => setShowModal(false)}>Cancel</button>

@@ -6,11 +6,11 @@ router = APIRouter()
 
 @router.get("/")
 def get_my_notifications(user: dict = Depends(get_current_user_required)):
-    return {"success": True, "data": ctrl.get_notifications(str(user["_id"]))}
+    return {"success": True, "data": ctrl.get_notifications(user.get("employee_id"))}
 
 @router.get("/unread-count")
 def unread_count(user: dict = Depends(get_current_user_required)):
-    return {"success": True, "count": ctrl.get_unread_count(str(user["_id"]))}
+    return {"success": True, "count": ctrl.get_unread_count(user.get("employee_id"))}
 
 @router.put("/{nid}/read")
 def mark_read(nid: str, user: dict = Depends(get_current_user_required)):
@@ -18,4 +18,4 @@ def mark_read(nid: str, user: dict = Depends(get_current_user_required)):
 
 @router.put("/read-all")
 def mark_all_read(user: dict = Depends(get_current_user_required)):
-    return {"success": True, "data": ctrl.mark_all_as_read(str(user["_id"]))}
+    return {"success": True, "data": ctrl.mark_all_as_read(user.get("employee_id"))}

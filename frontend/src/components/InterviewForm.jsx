@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { addInterview } from '../services/api'
+import { addInterview, getCandidates } from '../services/api'
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
@@ -12,17 +12,22 @@ function getFirst(y,m){ return new Date(y,m,1).getDay() }
 
 export default function InterviewForm({ employees, preselectedEmployee, onSave, onClose }) {
   const today = new Date()
+  const [candidates, setCandidates] = useState([])
   const [calY, setCalY] = useState(today.getFullYear())
   const [calM, setCalM] = useState(today.getMonth())
   const [selDate, setSelDate]   = useState('')
   const [selTime, setSelTime]   = useState('')
   const [selType, setSelType]   = useState('')
+  const [selCand, setSelCand]   = useState('')
   const [selEmp,  setSelEmp]    = useState(preselectedEmployee?._id || '')
   const [meetLink, setMeetLink] = useState('')
   const [loading, setLoading]   = useState(false)
   const [error,   setError]     = useState('')
 
-  useEffect(() => { if (preselectedEmployee) setSelEmp(preselectedEmployee._id) }, [preselectedEmployee])
+  useEffect(() => {
+    getCandidates().then(res => setCandidates(res.data.data)).catch(console.error)
+    if (preselectedEmployee) setSelEmp(preselectedEmployee._id)
+  }, [preselectedEmployee])
 
   const isPast = (d) => toDateStr(calY, calM, d) < today.toISOString().split('T')[0]
 
@@ -33,17 +38,30 @@ export default function InterviewForm({ employees, preselectedEmployee, onSave, 
 
   const generateMeetLink = () => {
     window.open('https://meet.google.com/new', '_blank')
-    setMeetLink('https://meet.google.com/') // prompt user to paste the generated link
+    setMeetLink('https://meet.google.com/') 
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!selEmp||!selDate||!selTime||!selType){ setError('Please fill all required fields'); return }
+    if (!selEmp||!selDate||!selTime||!selType||!selCand){ setError('Please fill all required fields'); return }
     setLoading(true); setError('')
+    
+    const empDoc = employees.find(e => e._id === selEmp)
+    
     try {
-      await addInterview({ employee: selEmp, date: selDate, time: selTime, type: selType, meeting_link: meetLink })
+      await addInterview({ 
+        candidate_id: selCand,
+        employee: selEmp, 
+        interviewer: empDoc ? empDoc.name : 'Staff',
+        date: selDate, 
+        time: selTime, 
+        type: selType, 
+        meeting_link: meetLink 
+      })
       onSave()
-    } catch(err) { setError(err.response?.data?.detail || 'Failed to schedule')
+    } catch(err) { 
+      const detail = err.response?.data?.detail
+      setError(typeof detail === 'string' ? detail : 'Failed to schedule. Check for conflicting slots.')
     } finally { setLoading(false) }
   }
 
@@ -63,7 +81,15 @@ export default function InterviewForm({ employees, preselectedEmployee, onSave, 
           {error && <div className="slot-error">⚠️ {error}</div>}
 
           <div className="form-group" style={{padding:'0 24px',marginTop:20}}>
-            <label>Select Employee *</label>
+            <label>Select Candidate *</label>
+            <select value={selCand} onChange={e=>setSelCand(e.target.value)} required>
+              <option value="">Choose Candidate</option>
+              {candidates.map(c=><option key={c._id} value={c._id}>{c.name}</option>)}
+            </select>
+          </div>
+
+          <div className="form-group" style={{padding:'0 24px',marginTop:12}}>
+            <label>Select Interviewer *</label>
             <select value={selEmp} onChange={e=>setSelEmp(e.target.value)} required>
               <option value="">Choose Employee</option>
               {employees.map(e=><option key={e._id} value={e._id}>{e.name} — {e.role}</option>)}

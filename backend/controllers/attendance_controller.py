@@ -6,35 +6,84 @@ from fastapi import HTTPException
 def serialize(doc) -> dict:
     if not doc: return None
     doc["_id"] = str(doc["_id"])
+    # Robustly join employee name and username if missing
+    if not doc.get("employee_name") or doc.get("employee_name") == "Unknown" or not doc.get("employee_username"):
+        try:
+            emp = employees_col.find_one({"_id": ObjectId(doc.get("employee_id"))})
+            if emp:
+                doc["employee_name"] = emp.get("name", "Unknown")
+                doc["employee_username"] = emp.get("username", "Unknown")
+            else:
+                # If not in employees, maybe in users?
+                from config.db import users_col
+                user_doc = users_col.find_one({"_id": ObjectId(doc.get("employee_id"))})
+                if user_doc:
+                    doc["employee_username"] = user_doc.get("username", "Unknown")
+                    # Try to find employee by name/username
+                    emp_by_name = employees_col.find_one({"username": user_doc.get("username")})
+                    if emp_by_name:
+                        doc["employee_name"] = emp_by_name.get("name", "Unknown")
+                    else:
+                        doc["employee_name"] = user_doc.get("username", "Unknown")
+        except:
+            pass
     return doc
 
-def get_attendance(employee_id: str = None, date: str = None):
+def get_attendance(employee_id: str = None, date: str = None, search: str = ""):
     query = {}
-    if employee_id: query["employee_id"] = employee_id
-    if date: query["date"] = date
+    if employee_id: 
+        query["employee_id"] = employee_id
+    if date: 
+        query["date"] = date
     
     docs = list(attendance_col.find(query).sort("date", -1))
-    return [serialize(d) for d in docs]
+    results = [serialize(d) for d in docs]
+    
+    if search:
+        search = search.lower()
+        results = [r for r in results if search in r.get("employee_name", "").lower() or search in r.get("employee_username", "").lower()]
+        
+    return results
 
 def check_in_out(employee_id: str, type: str):
     now = datetime.now()
     today_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%I:%M %p")
     
-    # Find existing record for today
     record = attendance_col.find_one({"employee_id": employee_id, "date": today_str})
     
     if type == "check-in":
         if record:
             raise HTTPException(status_code=400, detail="Already checked in today")
         
-        # Determine status (e.g., after 9:30 AM is Late)
         status = "Present"
         if now.hour > 9 or (now.hour == 9 and now.minute > 30):
             status = "Late"
             
+        # Fetch employee details to save username/name
+        emp = None
+        username = "Unknown"
+        try:
+            emp = employees_col.find_one({"_id": ObjectId(employee_id)})
+            if emp:
+                username = emp.get("username", "Unknown")
+            else:
+                # Try finding in users table
+                from config.db import users_col
+                u = users_col.find_one({"_id": ObjectId(employee_id)})
+                if u: 
+                    username = u.get("username")
+                    # Sync back to employee if possible
+                    emp = employees_col.find_one({"username": username})
+        except:
+            pass
+        
+        emp_name = emp["name"] if emp else (username if username != "Unknown" else "Staff Member")
+        
         new_record = {
             "employee_id": employee_id,
+            "employee_name": emp_name,
+            "employee_username": username,
             "date": today_str,
             "status": status,
             "check_in": time_str,
@@ -50,15 +99,13 @@ def check_in_out(employee_id: str, type: str):
         if record.get("check_out"):
             raise HTTPException(status_code=400, detail="Already checked out today")
             
-        # Calculate work hours (simplified)
         check_in_time = datetime.strptime(record["check_in"], "%I:%M %p")
-        # Note: This is simplified as it doesn't handle date crossover, 
-        # but for a daily check-in it works.
-        duration = now.hour - check_in_time.hour + (now.minute - check_in_time.minute)/60
+        # Handle same-day duration
+        duration = (now.hour - check_in_time.hour) + (now.minute - check_in_time.minute)/60
         
         attendance_col.update_one(
             {"_id": record["_id"]},
-            {"$set": {"check_out": time_str, "work_hours": round(duration, 2)}}
+            {"$set": {"check_out": time_str, "work_hours": max(0, round(duration, 2))}}
         )
         return {"message": f"Checked out at {time_str}", "hours": round(duration, 2)}
 
@@ -66,9 +113,31 @@ def get_attendance_stats(employee_id: str = None):
     query = {}
     if employee_id:
         query["employee_id"] = employee_id
-    docs = list(attendance_col.find(query))
-    stats = {"Present": 0, "Late": 0, "Absent": 0, "On Leave": 0, "totalHours": 0}
-    for d in docs:
-        stats[d["status"]] = stats.get(d["status"], 0) + 1
-        stats["totalHours"] += d.get("work_hours", 0)
-    return stats
+        docs = list(attendance_col.find(query))
+        stats = {"Present": 0, "Late": 0, "Absent": 0, "On Leave": 0, "totalHours": 0}
+        for d in docs:
+            stats[d["status"]] = stats.get(d["status"], 0) + 1
+            stats["totalHours"] += d.get("work_hours", 0)
+        return stats
+    else:
+        # Admin stats for today
+        today = datetime.now().strftime("%Y-%m-%d")
+        all_emps = list(employees_col.find({"role": "employee"}, {"name": 1, "username": 1}))
+        total_employees = len(all_emps)
+        
+        present_docs = list(attendance_col.find({"date": today}))
+        present_ids = {d["employee_id"] for d in present_docs}
+        
+        present_today = len(present_ids)
+        late_today = attendance_col.count_documents({"date": today, "status": "Late"})
+        
+        absent_employees = [e["name"] for e in all_emps if str(e["_id"]) not in present_ids]
+        
+        return {
+            "total_employees": total_employees,
+            "present_today": present_today,
+            "late_today": late_today,
+            "absent_today": max(0, total_employees - present_today),
+            "absent_list": absent_employees,
+            "attendance_percentage": round((present_today / total_employees * 100), 1) if total_employees > 0 else 0
+        }

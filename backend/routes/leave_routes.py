@@ -25,16 +25,29 @@ def add_leave(data: LeaveCreate, user: dict = Depends(get_current_user_required)
     # Auto-assign employee_id if user is employee
     if user.get("role") == "employee":
         data.employee_id = user.get("employee_id")
+    elif not data.employee_id:
+        return {"success": False, "message": "Employee ID is required"}
+    
     return {"success": True, "data": ctrl.create_leave(data)}
 
 @router.put("/{lid}")
 def update_leave(lid: str, data: LeaveUpdate, user: dict = Depends(get_current_user_required)):
-    # Only Admin can approve/reject
+    # Only Admin/HR can approve/reject
     if user.get("role") == "employee":
-        # Employees might only update their own PENDING leaves
-        pass
+        return {"success": False, "message": "Employees cannot update leave status"}
+    
     return {"success": True, "data": ctrl.update_leave(lid, data)}
 
 @router.delete("/{lid}")
 def delete_leave(lid: str, user: dict = Depends(get_current_user_required)):
+    # Employees can only delete their own PENDING leaves
+    if user.get("role") == "employee":
+        leave = ctrl.get_leave_by_id(lid)
+        if not leave:
+            return {"success": False, "message": "Leave request not found"}
+        if leave["employee_id"] != user.get("employee_id"):
+            return {"success": False, "message": "Unauthorized"}
+        if leave["status"] != "Pending":
+            return {"success": False, "message": "Cannot delete non-pending leaves"}
+            
     return {"success": True, "data": ctrl.delete_leave(lid)}

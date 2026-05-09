@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getInterviews, addInterview, updateInterview, deleteInterview, getCandidates } from '../services/api'
+import { getInterviews, addInterview, updateInterview, deleteInterview, getCandidates, getEmployees } from '../services/api'
 
 const STAGES = ['Scheduled', 'In Progress', 'Completed', 'Cancelled']
 const TYPES = ['HR Round', 'Technical', 'Final Round', 'Cultural Fit']
@@ -7,21 +7,36 @@ const TYPES = ['HR Round', 'Technical', 'Final Round', 'Cultural Fit']
 export default function Interviews() {
   const [interviews, setInterviews] = useState([])
   const [candidates, setCandidates] = useState([])
+  const [employees, setEmployees] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [feedbackModal, setFeedbackModal] = useState(null)
-  const [form, setForm] = useState({ candidate_id: '', date: '', time: '', type: 'Technical', interviewer: '', meeting_link: 'https://meet.google.com/new' })
+  const [form, setForm] = useState({ 
+    candidate_id: '', 
+    date: new Date().toISOString().split('T')[0], 
+    time: '10:00', 
+    type: 'Technical', 
+    interviewer: '', 
+    employee: '', 
+    meeting_link: 'https://meet.google.com/new' 
+  })
   const [feedbackForm, setFeedbackForm] = useState({ rating: 5, feedback: '', status: 'Completed' })
   const [toast, setToast] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
 
-  const showToast = msg => { setToast(msg); setTimeout(() => setToast(''), 3000) }
+  const showToast = msg => { setToast(msg); setTimeout(() => setToast(''), 4000) }
 
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const [intRes, candRes] = await Promise.all([getInterviews(), getCandidates()])
+      const [intRes, candRes, empRes] = await Promise.all([
+        getInterviews(), 
+        getCandidates(),
+        getEmployees()
+      ])
       setInterviews(intRes.data.data)
       setCandidates(candRes.data.data)
+      setEmployees(empRes.data.data)
     } catch (e) { console.error(e) } finally { setLoading(false) }
   }, [])
 
@@ -29,22 +44,58 @@ export default function Interviews() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (!form.candidate_id || !form.employee) {
+      showToast('⚠️ Please select both a candidate and an interviewer')
+      return
+    }
+
+    setIsSaving(true)
+    const payload = {
+      candidate_id: form.candidate_id,
+      interviewer: form.interviewer || "Staff",
+      employee: form.employee,
+      date: form.date,
+      time: form.time,
+      type: form.type,
+      meeting_link: form.meeting_link,
+      notes: ""
+    }
+
     try {
-      await addInterview(form)
-      showToast('✅ Interview scheduled!')
-      setShowModal(false)
-      fetchData()
-    } catch (err) { showToast('❌ Error scheduling', 'danger') }
+      const res = await addInterview(payload)
+      if (res.data.success) {
+        showToast('✅ Interview scheduled successfully!')
+        setShowModal(false)
+        setForm({ 
+          candidate_id: '', 
+          date: new Date().toISOString().split('T')[0], 
+          time: '10:00', type: 'Technical', interviewer: '', employee: '', 
+          meeting_link: 'https://meet.google.com/new' 
+        })
+        fetchData()
+      } else {
+        showToast('❌ Server error: ' + (res.data.message || 'Unknown error'))
+      }
+    } catch (err) { 
+      showToast('❌ Network error. Please try again.') 
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleFeedback = async (e) => {
     e.preventDefault()
+    setIsSaving(true)
     try {
       await updateInterview(feedbackModal._id, feedbackForm)
       showToast('✅ Feedback submitted!')
       setFeedbackModal(null)
       fetchData()
-    } catch (err) { showToast('❌ Update failed', 'danger') }
+    } catch (err) { 
+      showToast('❌ Update failed') 
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleCancel = async (id) => {
@@ -162,12 +213,27 @@ export default function Interviews() {
                     {TYPES.map(t => <option key={t}>{t}</option>)}
                   </select>
                 </div>
-                <div className="form-group"><label>Interviewer Name</label><input value={form.interviewer} onChange={e => setForm({ ...form, interviewer: e.target.value })} placeholder="e.g. Sarah Smith" required /></div>
+                <div className="form-group">
+                  <label>Interviewer *</label>
+                  <select 
+                    value={form.employee} 
+                    onChange={e => {
+                      const emp = employees.find(emp => emp._id === e.target.value)
+                      setForm({ ...form, employee: e.target.value, interviewer: emp ? emp.name : '' })
+                    }}
+                    required
+                  >
+                    <option value="">Select Interviewer...</option>
+                    {employees.map(e => <option key={e._id} value={e._id}>{e.name} ({e.role})</option>)}
+                  </select>
+                </div>
                 <div className="form-group full-width"><label>Meeting Link (Optional)</label><input value={form.meeting_link} onChange={e => setForm({ ...form, meeting_link: e.target.value })} placeholder="https://zoom.us/j/..." /></div>
               </div>
               <div className="form-actions" style={{ marginTop: 24 }}>
                 <button type="button" className="btn-outline" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn-primary">Send Invite</button>
+                <button type="submit" className="btn-primary" disabled={!form.candidate_id || !form.employee || isSaving}>
+                  {isSaving ? '⏳ Scheduling...' : 'Schedule Interview'}
+                </button>
               </div>
             </form>
           </div>
@@ -193,7 +259,9 @@ export default function Interviews() {
               <div className="form-group" style={{ marginTop: 16 }}><label>Feedback & Notes</label><textarea rows="4" value={feedbackForm.feedback} onChange={e => setFeedbackForm({ ...feedbackForm, feedback: e.target.value })} placeholder="How did the candidate perform?" required /></div>
               <div className="form-actions" style={{ marginTop: 24 }}>
                 <button type="button" className="btn-outline" onClick={() => setFeedbackModal(null)}>Cancel</button>
-                <button type="submit" className="btn-primary">Submit Result</button>
+                <button type="submit" className="btn-primary" disabled={isSaving}>
+                  {isSaving ? '⏳ Submitting...' : 'Submit Result'}
+                </button>
               </div>
             </form>
           </div>

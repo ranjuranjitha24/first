@@ -60,6 +60,13 @@ export default function Payroll() {
 
   const formatCurrency = (val) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(val)
 
+  const handleDownload = (p) => {
+    showToast('📄 Generating payslip PDF...')
+    setTimeout(() => {
+      window.print()
+    }, 1000)
+  }
+
   return (
     <div className="page-content page-fade-in">
       {toast.show && <div className={`toast show ${toast.type}`} style={{ position: 'fixed', top: 24, right: 24, zIndex: 10001 }}>{toast.msg}</div>}
@@ -134,7 +141,7 @@ export default function Payroll() {
                           {isHR && p.status === 'Pending' && (
                             <button className="btn-icon" title="Mark as Paid" onClick={() => handleUpdateStatus(p._id, 'Paid')}>💰</button>
                           )}
-                          <button className="btn-icon" title="Download PDF" onClick={() => showToast('💾 Downloading Payslip...')}>⬇️</button>
+                          <button className="btn-icon" title="Download PDF" onClick={() => handleDownload(p)}>⬇️</button>
                         </div>
                       </td>
                     </tr>
@@ -216,7 +223,7 @@ export default function Payroll() {
                 <div className="dropdown-divider" style={{ background: 'var(--primary)', height: 2 }}></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800 }}><span>Net Salary</span><span style={{ color: 'var(--primary)' }}>{formatCurrency(payslipModal.net_salary)}</span></div>
               </div>
-              <button className="btn-primary" style={{ width: '100%', marginTop: 32 }} onClick={() => showToast('💾 Downloading Payslip PDF...')}>⬇️ Download PDF Statement</button>
+              <button className="btn-primary" style={{ width: '100%', marginTop: 32 }} onClick={() => handleDownload(payslipModal)}>⬇️ Download PDF Statement</button>
             </div>
           </div>
         </div>

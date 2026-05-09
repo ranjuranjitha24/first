@@ -9,6 +9,7 @@ import Interviews from './pages/Interviews'
 import Jobs from './pages/Jobs'
 import Candidates from './pages/Candidates'
 import Leaves from './pages/Leaves'
+import Meetings from './pages/Meetings'
 import Reviews from './pages/Reviews'
 import Login from './pages/Login'
 import Careers from './pages/Careers'
@@ -17,6 +18,7 @@ import Attendance from './pages/Attendance'
 import Profile from './pages/Profile'
 import Payroll from './pages/Payroll'
 import CandidateDashboard from './pages/CandidateDashboard'
+import Notifications from './pages/Notifications'
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('hr_token')
@@ -72,8 +74,10 @@ function App() {
                   {/* Shared Routes */}
                   <Route path="/interviews" element={<RoleRoute roles={['admin','hr','employee','candidate']}><Interviews /></RoleRoute>} />
                   <Route path="/leaves"     element={<RoleRoute roles={['admin','hr','employee']}><Leaves /></RoleRoute>} />
+                  <Route path="/meetings"   element={<RoleRoute roles={['admin','hr','employee']}><Meetings /></RoleRoute>} />
                   <Route path="/reviews"    element={<RoleRoute roles={['admin','hr','employee']}><Reviews /></RoleRoute>} />
                   <Route path="/profile"    element={<RoleRoute roles={['admin','hr','employee','candidate']}><Profile /></RoleRoute>} />
+                  <Route path="/notifications" element={<RoleRoute roles={['admin','hr','employee','candidate']}><Notifications /></RoleRoute>} />
                   
                   <Route path="/dashboard" element={<Navigate to="/" replace />} />
                 </Routes>

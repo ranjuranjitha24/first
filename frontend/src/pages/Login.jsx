@@ -74,6 +74,15 @@ export default function Login() {
           <div className="login-hint">
             <span>Enter any username and password to sign in</span>
           </div>
+
+          <div className="demo-accounts" style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 12, textAlign: 'center' }}>DEMO ACCOUNTS</p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+              <button className="btn-outline" style={{ fontSize: 11, padding: '6px 12px' }} onClick={() => setForm({ username: 'admin', password: 'admin' })}>Admin</button>
+              <button className="btn-outline" style={{ fontSize: 11, padding: '6px 12px' }} onClick={() => setForm({ username: 'employee1', password: 'pass' })}>Employee</button>
+              <button className="btn-outline" style={{ fontSize: 11, padding: '6px 12px' }} onClick={() => setForm({ username: 'candidate1', password: 'pass' })}>Candidate</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

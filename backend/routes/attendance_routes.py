@@ -9,6 +9,7 @@ router = APIRouter()
 def get_attendance(
     employee_id: str = Query(None), 
     date: str = Query(None), 
+    search: str = Query(""),
     user: dict = Depends(get_current_user_required)
 ):
     # If employee, they can only see their own attendance
@@ -17,7 +18,7 @@ def get_attendance(
     else:
         emp_id = employee_id
     
-    return {"success": True, "data": ctrl.get_attendance(emp_id, date)}
+    return {"success": True, "data": ctrl.get_attendance(emp_id, date, search)}
 
 @router.get("/stats")
 def get_stats(employee_id: str = Query(None), user: dict = Depends(get_current_user_required)):

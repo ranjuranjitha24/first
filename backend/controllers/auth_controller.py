@@ -2,6 +2,7 @@ import hashlib
 import time
 import base64
 import json
+from datetime import datetime
 from config.db import users_col
 from models.user_model import UserCreate, UserLogin
 from fastapi import HTTPException, Depends, Header
@@ -60,8 +61,9 @@ def login_user(data: UserLogin) -> dict:
     if user:
         if user["password"] != hash_pw(data.password):
             raise HTTPException(status_code=401, detail="Wrong password")
-        role = user.get("role", "employee") # Default to employee
-        employee_id = str(user.get("_id"))
+        role = user.get("role", "employee") 
+        # Crucial: Use the linked employee_id if it exists, otherwise fall back to user _id
+        employee_id = str(user.get("employee_id") or user.get("_id"))
     else:
         raise HTTPException(status_code=401, detail="User not found")
 
@@ -69,20 +71,38 @@ def login_user(data: UserLogin) -> dict:
     return {"token": token, "username": data.username, "role": role}
 
 def seed_admin():
-    if users_col.count_documents({"username": "admin"}) == 0:
+    from config.db import employees_col
+    if employees_col.count_documents({"email": "admin@hrpro.com"}) == 0:
+        admin_res = employees_col.insert_one({
+            "name": "Admin User", 
+            "email": "admin@hrpro.com", 
+            "role": "admin", 
+            "department": "Management",
+            "createdAt": datetime.now().isoformat()
+        })
         users_col.insert_one({
             "username": "admin", 
             "password": hash_pw("admin123"), 
-            "role": "admin"
+            "role": "admin",
+            "employee_id": str(admin_res.inserted_id)
         })
-        print("✅ Admin created: admin | admin123")
-    if users_col.count_documents({"username": "user"}) == 0:
+        print("✅ Admin Employee & User created")
+    
+    if employees_col.count_documents({"email": "user@hrpro.com"}) == 0:
+        user_res = employees_col.insert_one({
+            "name": "Default Employee", 
+            "email": "user@hrpro.com", 
+            "role": "employee", 
+            "department": "Engineering",
+            "createdAt": datetime.now().isoformat()
+        })
         users_col.insert_one({
             "username": "user", 
             "password": hash_pw("user123"), 
-            "role": "employee"
+            "role": "employee",
+            "employee_id": str(user_res.inserted_id)
         })
-        print("✅ Employee created: user | user123")
+        print("✅ Default Employee & User created")
     if users_col.count_documents({"username": "candidate"}) == 0:
         users_col.insert_one({
             "username": "candidate", 
@@ -91,11 +111,27 @@ def seed_admin():
         })
         print("✅ Candidate created: candidate | candidate123")
     
-    from config.db import candidates_col
+    from config.db import candidates_col, jobs_col
+    if jobs_col.count_documents({}) == 0:
+        jobs = [
+            {"title": "Frontend Developer", "department": "Engineering", "location": "Bangalore", "type": "Full-time", "status": "Open", "createdAt": datetime.now().isoformat()},
+            {"title": "Backend Developer", "department": "Engineering", "location": "Remote", "type": "Full-time", "status": "Open", "createdAt": datetime.now().isoformat()},
+            {"title": "UI/UX Designer", "department": "Design", "location": "Bangalore", "type": "Contract", "status": "Open", "createdAt": datetime.now().isoformat()}
+        ]
+        jobs_col.insert_many(jobs)
+        print("✅ Sample jobs seeded")
+
     if candidates_col.count_documents({}) == 0:
-        candidates_col.insert_many([
-            {"name": "Aditya Verma", "email": "aditya@example.com", "job_title": "Frontend Developer", "status": "Applied", "skills": "React, CSS"},
-            {"name": "Sneha Rao", "email": "sneha@example.com", "job_title": "Backend Developer", "status": "Shortlisted", "skills": "Python, FastAPI"},
-            {"name": "John Doe", "email": "john@example.com", "job_title": "UI/UX Designer", "status": "Interview", "skills": "Figma, Adobe XD"}
-        ])
-        print("✅ Sample candidates seeded")
+        # Get job IDs safely
+        fe_job = jobs_col.find_one({"title": "Frontend Developer"}) or {"_id": "fe_id"}
+        be_job = jobs_col.find_one({"title": "Backend Developer"}) or {"_id": "be_id"}
+        ui_job = jobs_col.find_one({"title": "UI/UX Designer"}) or {"_id": "ui_id"}
+        
+        candidates = [
+            {"name": "Aditya Verma", "email": "aditya@example.com", "job_id": str(fe_job.get("_id")), "stage": "Applied", "skills": "React, CSS", "createdAt": datetime.now().isoformat()},
+            {"name": "Sneha Rao", "email": "sneha@example.com", "job_id": str(be_job.get("_id")), "stage": "Shortlisted", "skills": "Python, FastAPI", "createdAt": datetime.now().isoformat()},
+            {"name": "John Doe", "email": "john@example.com", "job_id": str(ui_job.get("_id")), "stage": "Interview", "skills": "Figma, Adobe XD", "createdAt": datetime.now().isoformat()},
+            {"name": "Laksh", "email": "laksh@example.com", "job_id": str(fe_job.get("_id")), "stage": "Applied", "skills": "JavaScript, Tailwind", "createdAt": datetime.now().isoformat()}
+        ]
+        candidates_col.insert_many(candidates)
+        print("✅ Sample candidates seeded (including Laksh)")

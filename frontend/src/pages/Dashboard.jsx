@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getStats, getEmployees, getUpcomingInterviews, getLeaves, getCurrentUser } from '../services/api'
+import { getStats, getEmployees, getUpcomingInterviews, getLeaves, getCurrentUser, getUpcomingMeetings } from '../services/api'
 import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, CartesianGrid } from 'recharts'
 
@@ -133,6 +133,7 @@ export default function Dashboard() {
   const [stats, setStats]           = useState({totalEmployees:0,scheduled:0,completed:0,cancelled:0})
   const [recentEmps, setRecent]     = useState([])
   const [upcomingInts, setUpcoming] = useState([])
+  const [upcomingMeets, setMeets]   = useState([])
   const [pendingLeaves, setPending] = useState(0)
   const [empByRole, setEmpByRole]   = useState([])
   const [loading, setLoading]       = useState(true)
@@ -140,19 +141,20 @@ export default function Dashboard() {
   
   const user = getCurrentUser() || {}
   const isHR = user.role !== 'employee'
-
   useEffect(() => {
     const fetchDashboardData = async () => {
       setLoading(true)
       try {
-        const [statsRes, upcomingRes, leavesRes] = await Promise.all([
+        const [statsRes, upcomingRes, leavesRes, meetsRes] = await Promise.all([
           getStats().catch(()=>({data:{data:{totalEmployees:0,scheduled:0,completed:0,cancelled:0}}})),
           getUpcomingInterviews().catch(()=>({data:{data:[]}})),
-          getLeaves(isHR ? { status: 'Pending' } : {}).catch(()=>({data:{data:[]}}))
+          getLeaves(isHR ? { status: 'Pending' } : {}).catch(()=>({data:{data:[]}})),
+          isHR ? Promise.resolve({data:{data:[]}}) : getUpcomingMeetings().catch(()=>({data:{data:[]}}))
         ])
         
         setStats(statsRes.data.data)
         setUpcoming(upcomingRes.data.data)
+        setMeets(meetsRes.data.data || [])
         
         const leaves = leavesRes.data.data
         setPending(isHR ? leaves.length : (leaves.filter ? leaves.filter(l => l.status === 'Pending').length : 0))
@@ -213,7 +215,7 @@ export default function Dashboard() {
         </div>
 
         <div className="stats-grid">
-          <StatCard icon="📅" value={upcomingInts.length} label="My Meetings" colorClass="primary" />
+          <StatCard icon="📅" value={upcomingMeets.length} label="My Meetings" colorClass="primary" />
           <StatCard icon="🌴" value={pendingLeaves}      label="Pending Leaves" colorClass="warning" />
           <StatCard icon="⭐" value={4.8}                label="Performance Score" colorClass="success" />
           <StatCard icon="🏆" value={12}                label="Tasks Completed" colorClass="info" />
@@ -244,21 +246,36 @@ export default function Dashboard() {
           <div className="card">
             <div className="card-header">
               <h3>Upcoming Meetings</h3>
+              <button className="link-btn" onClick={()=>navigate('/meetings')}>View All</button>
             </div>
             <div className="recent-list">
-              {upcomingInts.length === 0 
+              {upcomingMeets.length === 0 
                 ? <div className="empty-state" style={{padding:20}}><p>No meetings today</p></div>
-                : upcomingInts.map(i => (
-                  <div key={i._id} className="recent-item">
-                    <div className="avatar">📅</div>
-                    <div className="recent-info">
-                      <div className="recent-name">{i.type}</div>
-                      <div className="recent-sub">{i.date} · {i.time}</div>
+                : upcomingMeets.map(m => (
+                  <div key={m._id} className="recent-item">
+                    <div className="avatar" style={{background:'var(--primary-glow)', color:'var(--primary)'}}>🤝</div>
+                    <div className="recent-info" style={{flex:1}}>
+                      <div className="recent-name">{m.title}</div>
+                      <div className="recent-sub">{m.date} · {m.time}</div>
                     </div>
+                    {m.meeting_link && !m.meeting_link.endsWith('/new') && <a href={m.meeting_link} target="_blank" rel="noreferrer" className="btn-join-meet" style={{padding:'4px 8px', fontSize:11}}>Join</a>}
                   </div>
                 ))
               }
             </div>
+          </div>
+        </div>
+
+        <div className="stats-grid" style={{ marginTop: 24 }}>
+          <div className="card glass" style={{ gridColumn: 'span 3', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div className="stat-icon-wrapper" style={{ background: 'var(--primary-glow)', fontSize: 24 }}>🔔</div>
+              <div>
+                <h4 style={{ margin: 0, fontSize: 16 }}>Pending Notifications</h4>
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>You have several unread alerts in your inbox.</p>
+              </div>
+            </div>
+            <button className="btn-primary" onClick={() => navigate('/notifications')}>Open Notifications</button>
           </div>
         </div>
 
@@ -267,16 +284,21 @@ export default function Dashboard() {
             <h3>Recent Activity</h3>
           </div>
           <div className="activity-feed">
-             {[
-              { id: 1, icon: '⭐', color: 'purple', title: 'Review Published', desc: 'Your Q1 performance review is now available for reading.', time: '2 hours ago', type: 'REVIEW' },
-              { id: 2, icon: '🌴', color: 'orange', title: 'Leave Approved', desc: 'Your leave request for May 20-22 has been approved.', time: '5 hours ago', type: 'LEAVE' },
-            ].map(act => (
-              <div key={act.id} className="activity-item">
-                <div className={`activity-icon ${act.color}`}>{act.icon}</div>
+             {upcomingMeets.length === 0 ? (
+               <div className="activity-item">
+                 <div className="activity-icon blue">✨</div>
+                 <div className="activity-content">
+                   <div className="activity-title">All caught up!</div>
+                   <div className="activity-desc">No recent activity to show for today.</div>
+                 </div>
+               </div>
+             ) : upcomingMeets.slice(0, 3).map(m => (
+              <div key={m._id} className="activity-item">
+                <div className={`activity-icon blue`}>🤝</div>
                 <div className="activity-content">
-                  <div className="activity-title">{act.title} <span className={`activity-badge ${act.color}`}>{act.type}</span></div>
-                  <div className="activity-desc">{act.desc}</div>
-                  <div className="activity-time">{act.time}</div>
+                  <div className="activity-title">Meeting Scheduled <span className={`activity-badge blue`}>MEETING</span></div>
+                  <div className="activity-desc">"{m.title}" is scheduled for {m.date} at {m.time}.</div>
+                  <div className="activity-time">{m.time}</div>
                 </div>
               </div>
             ))}

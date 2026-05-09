@@ -6,6 +6,7 @@ export default function TopNav() {
   const [showNotif, setShowNotif] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
+  const [toast, setToast] = useState({ show: false, msg: '', type: 'success' })
   const notifRef = useRef(null)
   const navigate = useNavigate()
   const user = getCurrentUser() || {}
@@ -16,8 +17,18 @@ export default function TopNav() {
         getNotifications(),
         getUnreadCount()
       ])
+      
+      const newCount = countRes.data.count
+      if (newCount > unreadCount && unreadCount !== 0) {
+        const latest = notifRes.data.data[0]
+        if (latest) {
+          setToast({ show: true, msg: `🔔 ${latest.title}: ${latest.message}`, type: latest.type === 'danger' ? 'danger' : 'success' })
+          setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 5000)
+        }
+      }
+      
       setNotifications(notifRes.data.data)
-      setUnreadCount(countRes.data.count)
+      setUnreadCount(newCount)
     } catch (e) {
       console.error('Failed to fetch notifications')
     }
@@ -55,6 +66,11 @@ export default function TopNav() {
 
   return (
     <nav className="top-nav">
+      {toast.show && (
+        <div className={`toast show ${toast.type} glass`} style={{ position: 'fixed', top: 80, right: 24, zIndex: 10002, width: 'auto', maxWidth: 400 }}>
+          {toast.msg}
+        </div>
+      )}
       <div className="search-bar">
         <span className="search-icon">🔍</span>
         <input type="text" placeholder="Search for employees, jobs, or documents..." />

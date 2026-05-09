@@ -5,7 +5,27 @@
 - Node.js (v18+)
 - MongoDB (running locally on port 27017)
 
+## 🚀 Deployment
+
+### Backend (Render)
+1. Create a new **Web Service** on Render.
+2. Connect your repository.
+3. Set **Build Command**: `pip install -r backend/requirements.txt`
+4. Set **Start Command**: `cd backend && gunicorn -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:$PORT`
+5. Add Environment Variables:
+   - `MONGO_URI`: Your MongoDB Atlas connection string.
+   - `PORT`: `5000`
+
+### Frontend (Vercel)
+1. Create a new **Project** on Vercel.
+2. Select the `frontend` directory.
+3. Set **Framework Preset**: `Vite`.
+4. Add Environment Variable:
+   - `VITE_API_URL`: Your Render backend URL (e.g., `https://hr-backend.onrender.com`).
+
 ---
+
+## 🛠️ Tech Stack
 
 ## ▶️ Step 1 — Install Backend
 ```bash

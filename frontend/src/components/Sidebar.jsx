@@ -13,12 +13,14 @@ const allNavItems = [
   { path: '/attendance',      icon: '⏰', label: 'Attendance',      roles: ['admin', 'hr'] },
   { path: '/payroll',         icon: '💰', label: 'Payroll',         roles: ['admin', 'hr'] },
   { path: '/leaves',          icon: '🌴', label: 'Leave Approvals', roles: ['admin', 'hr'] },
+  { path: '/meetings',        icon: '🤝', label: 'Meetings',         roles: ['admin', 'hr'] },
   { path: '/settings',        icon: '⚙️', label: 'Settings',       roles: ['admin', 'hr'] },
 
   // Employee
   { path: '/employee/dashboard', icon: '📊', label: 'Dashboard',      roles: ['employee'] },
   { path: '/attendance',         icon: '⏰', label: 'Attendance',     roles: ['employee'] },
   { path: '/leaves',             icon: '🌴', label: 'Leave Requests', roles: ['employee'] },
+  { path: '/meetings',           icon: '🤝', label: 'Meetings',         roles: ['employee'] },
   { path: '/reviews',            icon: '⭐', label: 'Reviews',        roles: ['employee'] },
   { path: '/profile',            icon: '👤', label: 'Profile',        roles: ['employee'] },
 

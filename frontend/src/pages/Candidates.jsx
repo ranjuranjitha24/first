@@ -68,18 +68,34 @@ export default function Candidates() {
           <div className="pipeline-cards">
             {filtered.filter(c => c.stage === stage).map(c => (
               <div key={c._id} className="pipeline-card-item">
-                <div className="card-name" style={{ fontSize: 14 }}>{c.name}</div>
-                <div className="card-role" style={{ fontSize: 11, marginBottom: 8 }}>{c.job_title}</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  {c.resume_link && <a href={c.resume_link} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: 'var(--primary)' }}>📄 Resume</a>}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div className="card-name" style={{ fontSize: 14, fontWeight: 700 }}>{c.name}</div>
+                  <button className="btn-icon" onClick={() => {
+                    if (c.resume_link) window.open(c.resume_link, '_blank')
+                    else alert('No resume link provided')
+                  }} title="View Resume">📄</button>
+                </div>
+                <div className="card-role" style={{ fontSize: 11, marginBottom: 12, opacity: 0.8 }}>{c.job_title}</div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <select 
                     className="status-select-mini" 
                     value={c.stage} 
                     onChange={e => handleStageChange(c._id, e.target.value)}
-                    style={{ fontSize: 10, padding: '2px 4px' }}
+                    style={{ fontSize: 11, padding: '4px 8px', borderRadius: 8, background: 'var(--bg-card)', border: '1px solid var(--border-color)' }}
                   >
                     {STAGES.map(s => <option key={s}>{s}</option>)}
                   </select>
+                  
+                  {c.stage === 'Shortlisted' && (
+                    <button 
+                      className="btn-join-meet" 
+                      style={{ fontSize: 10, padding: '6px' }}
+                      onClick={() => window.location.href = `/interviews?candidate=${c._id}&name=${encodeURIComponent(c.name)}`}
+                    >
+                      🗓️ Schedule Interview
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -125,7 +141,10 @@ export default function Candidates() {
                 <tbody>
                   {filtered.map(c => (
                     <tr key={c._id}>
-                      <td><div className="emp-name-text">{c.name}</div></td>
+                      <td>
+                        <div className="emp-name-text">{c.name}</div>
+                        {c.resume_link && <a href={c.resume_link} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: 'var(--primary)' }}>View Resume</a>}
+                      </td>
                       <td>{c.email}</td>
                       <td><span className="role-badge">{c.job_title}</span></td>
                       <td>
@@ -134,9 +153,14 @@ export default function Candidates() {
                         </span>
                       </td>
                       <td>
-                        <select className="status-select" value={c.stage} onChange={e => handleStageChange(c._id, e.target.value)}>
-                          {STAGES.map(s => <option key={s}>{s}</option>)}
-                        </select>
+                        <div className="action-buttons">
+                          <select className="status-select" value={c.stage} onChange={e => handleStageChange(c._id, e.target.value)}>
+                            {STAGES.map(s => <option key={s}>{s}</option>)}
+                          </select>
+                          {c.stage === 'Shortlisted' && (
+                            <button className="btn-icon" onClick={() => window.location.href = `/interviews?candidate=${c._id}&name=${encodeURIComponent(c.name)}`} title="Schedule Interview">🗓️</button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -163,7 +187,7 @@ export default function Candidates() {
                     {jobs.map(j => <option key={j._id} value={j._id}>{j.title}</option>)}
                   </select>
                 </div>
-                <div className="form-group"><label>Resume Link</label><input value={form.resume_link} onChange={e => setForm({ ...form, resume_link: e.target.value })} /></div>
+                <div className="form-group"><label>Resume Link</label><input value={form.resume_link} onChange={e => setForm({ ...form, resume_link: e.target.value })} placeholder="https://..." /></div>
               </div>
               <div className="form-actions" style={{ marginTop: 24 }}>
                 <button type="button" className="btn-outline" onClick={() => setShowModal(false)}>Cancel</button>

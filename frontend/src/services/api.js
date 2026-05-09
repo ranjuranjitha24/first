@@ -95,3 +95,10 @@ export const getPortalJobs     = () => API.get('/portal/jobs')
 export const applyForJob       = (data) => API.post('/portal/apply', data)
 export const getMyApplications = () => API.get('/portal/my-applications')
 export const getMyInterviews   = () => API.get('/portal/my-interviews')
+
+// ── MEETINGS ──
+export const getMeetings         = (params) => API.get('/meetings/', { params })
+export const getUpcomingMeetings = ()      => API.get('/meetings/upcoming')
+export const addMeeting          = (data)  => API.post('/meetings/', data)
+export const updateMeeting       = (id, data) => API.put(`/meetings/${id}`, data)
+export const deleteMeeting       = (id)    => API.delete(`/meetings/${id}`)
