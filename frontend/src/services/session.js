@@ -2,10 +2,9 @@
  * session.js — Centralized session management for RecruiterPro
  *
  * Design decisions:
- *  - Token lives purely in sessionStorage so it is automatically cleared when
- *    the tab or browser is closed.
- *  - Inactivity timeout is 30 minutes (configurable via INACTIVITY_MS).
- *  - Token expiry from the payload is always checked on read.
+ *  - Token stored in localStorage so it persists across tab/browser sessions.
+ *  - Session only ends on explicit logout.
+ *  - Inactivity timeout is effectively disabled (100 years).
  */
 
 export const TOKEN_KEY        = 'hr_token'
@@ -15,29 +14,39 @@ export const WARN_BEFORE_MS   = 0                                 // No warning 
 
 // ── Token I/O ─────────────────────────────────────────────────────────────
 
-/** Decode base64 token payload without throwing. */
+/**
+ * Decode our backend token — plain base64-encoded JSON (not a 3-part JWT).
+ * Falls back gracefully so a malformed token never crashes the app.
+ */
 function decode(token) {
   try {
-    let payload = token.split('.')[1] || token
-    payload = payload.replace(/-/g, '+').replace(/_/g, '/')
-    return JSON.parse(atob(payload))
+    // Our backend uses pure base64(JSON), not a dotted JWT.
+    // Never split on '.' — just decode the whole string.
+    const padded = token.replace(/-/g, '+').replace(/_/g, '/')
+    return JSON.parse(atob(padded))
   } catch {
     return null
   }
 }
 
-/** Save token to sessionStorage (clears on tab/browser close). */
+/** Save token to localStorage so it persists across tabs and refreshes. */
 export function saveToken(token) {
-  sessionStorage.setItem(TOKEN_KEY, token)
+  localStorage.setItem(TOKEN_KEY, token)
   touchActivity()
 }
 
-/** Read token — returns null if missing, expired, or malformed. */
+/**
+ * Read and validate the stored token.
+ * Returns null ONLY if the token is truly missing or its exp timestamp
+ * has already passed.  A token with no exp field is treated as valid.
+ */
 export function getToken() {
-  const token = sessionStorage.getItem(TOKEN_KEY)
+  const token = localStorage.getItem(TOKEN_KEY)
   if (!token) return null
   const payload = decode(token)
+  // If decode fails the token is corrupted — wipe it.
   if (!payload) { clearSession(); return null }
+  // Only reject if exp is present AND already in the past.
   if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
     clearSession()
     return null
@@ -52,22 +61,22 @@ export function getSessionUser() {
   return decode(token)
 }
 
-/** Remove all session data. */
+/** Remove all session data from localStorage. */
 export function clearSession() {
-  sessionStorage.removeItem(TOKEN_KEY)
-  sessionStorage.removeItem(LAST_ACTIVE_KEY)
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(LAST_ACTIVE_KEY)
 }
 
 // ── Activity tracking ──────────────────────────────────────────────────────
 
 /** Record user activity timestamp. */
 export function touchActivity() {
-  sessionStorage.setItem(LAST_ACTIVE_KEY, Date.now().toString())
+  localStorage.setItem(LAST_ACTIVE_KEY, Date.now().toString())
 }
 
 /** Return ms since last recorded activity (or Infinity if no record). */
 export function msSinceLastActivity() {
-  const last = parseInt(sessionStorage.getItem(LAST_ACTIVE_KEY) || '0', 10)
+  const last = parseInt(localStorage.getItem(LAST_ACTIVE_KEY) || '0', 10)
   return last ? Date.now() - last : Infinity
 }
 

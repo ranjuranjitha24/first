@@ -140,16 +140,17 @@ export default function Dashboard() {
   const navigate = useNavigate()
   
   const user = getCurrentUser() || {}
-  const isHR = user.role !== 'employee'
+  const isHR        = user.role === 'admin' || user.role === 'hr'
+  const isCandidate = user.role === 'candidate'
   useEffect(() => {
     const fetchDashboardData = async () => {
       setLoading(true)
       try {
         const [statsRes, upcomingRes, leavesRes, meetsRes] = await Promise.all([
-          getStats().catch(()=>({data:{data:{totalEmployees:0,scheduled:0,completed:0,cancelled:0}}})),
-          getUpcomingInterviews().catch(()=>({data:{data:[]}})),
-          getLeaves(isHR ? { status: 'Pending' } : {}).catch(()=>({data:{data:[]}})),
-          isHR ? Promise.resolve({data:{data:[]}}) : getUpcomingMeetings().catch(()=>({data:{data:[]}}))
+          isHR ? getStats().catch(()=>({data:{data:{totalEmployees:0,scheduled:0,completed:0,cancelled:0}}})) : Promise.resolve({data:{data:{totalEmployees:0,scheduled:0,completed:0,cancelled:0}}}),
+          isCandidate ? Promise.resolve({data:{data:[]}}) : getUpcomingInterviews().catch(()=>({data:{data:[]}})),
+          isCandidate ? Promise.resolve({data:{data:[]}}) : getLeaves(isHR ? { status: 'Pending' } : {}).catch(()=>({data:{data:[]}})),
+          (isHR || isCandidate) ? Promise.resolve({data:{data:[]}}) : getUpcomingMeetings().catch(()=>({data:{data:[]}}))
         ])
         
         setStats(statsRes.data.data)

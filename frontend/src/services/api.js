@@ -21,18 +21,27 @@ API.interceptors.request.use(cfg => {
   return cfg
 })
 
-// ── Response: auto-logout on 401 / 403 ───────────────────────────────────
+// ── Response: auto-logout ONLY on 401 (token missing/expired) ────────────
+// 403 = valid token but wrong role — do NOT wipe session for that.
+// Auth endpoints return 401 for wrong passwords too — skip those.
+const AUTH_ENDPOINTS = ['/auth/login', '/auth/candidate/login', '/auth/register',
+                        '/auth/candidate/register', '/auth/forgot-password', '/auth/reset-password']
+
 API.interceptors.response.use(
   res => res,
   err => {
-    const status = err.response?.status
-    if (status === 401 || status === 403) {
+    const status         = err.response?.status
+    const url            = err.config?.url || ''
+    const isAuthEndpoint = AUTH_ENDPOINTS.some(ep => url.includes(ep))
+
+    // Only 401 on a protected endpoint means expired/invalid session
+    if (status === 401 && !isAuthEndpoint) {
       clearSession()
-      // Hard redirect — avoids needing navigate() here
       if (!window.location.pathname.startsWith('/login')) {
         window.location.href = '/login?reason=expired'
       }
     }
+    // 403 = forbidden role — just let the component handle it silently
     return Promise.reject(err)
   }
 )

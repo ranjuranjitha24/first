@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getInterviews, addInterview, updateInterview, deleteInterview, getCandidates, getEmployees } from '../services/api'
+import { getInterviews, addInterview, updateInterview, deleteInterview, getCandidates, getEmployees, getCurrentUser } from '../services/api'
 
 const STAGES = ['Scheduled', 'In Progress', 'Completed', 'Cancelled']
 const TYPES = ['HR Round', 'Technical', 'Final Round', 'Cultural Fit']
@@ -26,19 +26,22 @@ export default function Interviews() {
 
   const showToast = msg => { setToast(msg); setTimeout(() => setToast(''), 4000) }
 
+  const user        = getCurrentUser() || {}
+  const isCandidate = user.role === 'candidate'
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
       const [intRes, candRes, empRes] = await Promise.all([
         getInterviews(), 
-        getCandidates(),
-        getEmployees()
+        isCandidate ? Promise.resolve({ data: { data: [] } }) : getCandidates(),
+        isCandidate ? Promise.resolve({ data: { data: [] } }) : getEmployees()
       ])
       setInterviews(intRes.data.data)
       setCandidates(candRes.data.data)
       setEmployees(empRes.data.data)
     } catch (e) { console.error(e) } finally { setLoading(false) }
-  }, [])
+  }, [isCandidate])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -125,7 +128,9 @@ export default function Interviews() {
           <h1 className="page-title">📅 Interview Management</h1>
           <p className="page-sub">Schedule and coordinate candidate assessments</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowModal(true)}>➕ Schedule Interview</button>
+        {!isCandidate && (
+          <button className="btn-primary" onClick={() => setShowModal(true)}>➕ Schedule Interview</button>
+        )}
       </div>
 
       <div className="dashboard-grid">
@@ -154,8 +159,12 @@ export default function Interviews() {
                           {item.status === 'Scheduled' && (
                             <>
                               <a href={item.meeting_link} target="_blank" rel="noreferrer" className="btn-join-meet">Join Meet</a>
-                              <button className="btn-icon" onClick={() => setFeedbackModal(item)}>📝</button>
-                              <button className="btn-icon delete" onClick={() => handleCancel(item._id)}>🚫</button>
+                              {!isCandidate && (
+                                <>
+                                  <button className="btn-icon" onClick={() => setFeedbackModal(item)}>📝</button>
+                                  <button className="btn-icon delete" onClick={() => handleCancel(item._id)}>🚫</button>
+                                </>
+                              )}
                             </>
                           )}
                           {item.status === 'Completed' && <span className="status-badge success">Completed</span>}

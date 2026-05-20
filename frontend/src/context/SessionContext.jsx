@@ -69,26 +69,8 @@ export function SessionProvider({ children }) {
     }
   }, [navigate, stopAllTimers])
 
-  // ── Login (called from Login page) ────────────────────────────────────────
-
-  const login = useCallback((token) => {
-    saveToken(token)
-    setUser(getSessionUser())
-    setShowWarning(false)
-    showWarningRef.current = false
-  }, [])
-
-  // ── Extend session (user clicked "Stay logged in") ────────────────────────
-
-  const extendSession = useCallback(() => {
-    touchActivity()
-    setShowWarning(false)
-    showWarningRef.current = false
-    clearInterval(countdownRef.current)
-    setCountdown(0)
-  }, [])
-
-  // ── Inactivity / expiry polling ───────────────────────────────────────────
+  // ── Inactivity / expiry polling ─────────────────────────────────────────
+  // Declared BEFORE login() so it can be referenced in login's dep array.
 
   const startPolling = useCallback(() => {
     clearInterval(pollRef.current)
@@ -119,7 +101,6 @@ export function SessionProvider({ children }) {
           setCountdown(prev => {
             if (prev <= 1) {
               clearInterval(countdownRef.current)
-              // Force-logout when countdown reaches zero
               logout('inactivity')
               return 0
             }
@@ -128,7 +109,27 @@ export function SessionProvider({ children }) {
         }, COUNTDOWN_TICK)
       }
     }, POLL_MS)
-  }, [logout])   // stable — logout is memoized with navigate only
+  }, [logout])
+
+  // ── Login (called from Login page) ──────────────────────────────────────
+
+  const login = useCallback((token) => {
+    saveToken(token)
+    setUser(getSessionUser())
+    setShowWarning(false)
+    showWarningRef.current = false
+    startPolling()   // begin polling as soon as user logs in
+  }, [startPolling])
+
+  // ── Extend session (user clicked "Stay logged in") ────────────────────────
+
+  const extendSession = useCallback(() => {
+    touchActivity()
+    setShowWarning(false)
+    showWarningRef.current = false
+    clearInterval(countdownRef.current)
+    setCountdown(0)
+  }, [])
 
   // ── Activity listeners (reset inactivity timer on any user interaction) ───
 
@@ -163,11 +164,12 @@ export function SessionProvider({ children }) {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
   // ↑ Intentionally empty-deps: this only runs once on mount
 
-  // ── Guard: if token disappears between polls, catch it immediately ─────────
-
+  // ── Guard: if token disappears between polls, catch it ─────────────────────
+  // NOTE: using a dep on `user` so this only re-runs when user state changes,
+  // NOT on every render (which caused false logouts during candidate navigation).
   useEffect(() => {
     if (user && !getToken()) logout('expired')
-  })   // runs after every render — lightweight since getToken() is synchronous
+  }, [user, logout])
 
   // ── Render ────────────────────────────────────────────────────────────────
 
