@@ -2,26 +2,34 @@ import hashlib
 import time
 import base64
 import json
+import secrets
 from datetime import datetime
-from config.db import users_col
-from models.user_model import UserCreate, UserLogin
-from fastapi import HTTPException, Depends, Header
+from config.db import users_col, notifications_col
+from models.user_model import UserCreate, UserLogin, CandidateRegister, CandidateLogin
+from fastapi import HTTPException
+
+
+# ── Helpers ──────────────────────────────────────────────────
 
 def hash_pw(pw: str) -> str:
     return hashlib.sha256(pw.encode()).hexdigest()
 
-def make_token(username: str, role: str, employee_id: str = None) -> str:
-    # Adding expiry (1 day) to make it feel like a real JWT
+
+def make_token(identifier: str, role: str, employee_id: str = None,
+               full_name: str = None, email: str = None) -> str:
     payload = {
-        "username": username, 
-        "role": role, 
-        "exp": int(time.time()) + 86400
+        "username": identifier,   # kept as 'username' key for backward-compat
+        "role": role,
+        "exp": int(time.time()) + 86400   # 24 h
     }
     if employee_id:
         payload["employee_id"] = employee_id
-    # Standard JWT-ish format: header.payload.signature
-    # Here we just base64 the payload for simplicity as requested to keep architecture
+    if full_name:
+        payload["full_name"] = full_name
+    if email:
+        payload["email"] = email
     return base64.b64encode(json.dumps(payload).encode()).decode()
+
 
 def verify_token(token: str) -> dict:
     try:
@@ -29,109 +37,240 @@ def verify_token(token: str) -> dict:
         if payload.get("exp", 0) < time.time():
             raise HTTPException(status_code=401, detail="Token expired")
         return payload
-    except:
+    except HTTPException:
+        raise
+    except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-def get_current_user(authorization: str = Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing authorization header")
-    token = authorization.split(" ")[1]
-    return verify_token(token)
 
-def check_role(user: dict, allowed_roles: list):
-    if user.get("role") not in allowed_roles:
-        raise HTTPException(status_code=403, detail="Access denied")
-    return True
+# ── Admin / HR authentication (username-based) ───────────────
 
 def register_user(data: UserCreate) -> dict:
     if users_col.find_one({"username": data.username}):
         raise HTTPException(status_code=400, detail="Username already exists")
-    doc = {"username": data.username, "password": hash_pw(data.password), "role": data.role}
+    doc = {
+        "username": data.username,
+        "password": hash_pw(data.password),
+        "role": data.role,
+        "createdAt": datetime.now().isoformat()
+    }
     users_col.insert_one(doc)
     return {"message": "User created"}
 
+
 def login_user(data: UserLogin) -> dict:
     user = users_col.find_one({"username": data.username})
-    
-    # Auto-seed test accounts if they don't exist
-    if not user and data.username in ["user", "candidate"]:
+
+    # Auto-seed test accounts on first run
+    if not user and data.username in ["admin", "user", "candidate"]:
         seed_admin()
         user = users_col.find_one({"username": data.username})
 
-    if user:
-        if user["password"] != hash_pw(data.password):
-            raise HTTPException(status_code=401, detail="Wrong password")
-        role = user.get("role", "employee") 
-        # Crucial: Use the linked employee_id if it exists, otherwise fall back to user _id
-        employee_id = str(user.get("employee_id") or user.get("_id"))
-    else:
+    if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    if user["password"] != hash_pw(data.password):
+        raise HTTPException(status_code=401, detail="Wrong password")
 
-    token = make_token(data.username, role, employee_id)
+    role = user.get("role", "employee")
+    employee_id = str(user.get("employee_id") or user.get("_id"))
+    full_name = user.get("full_name", user.get("username"))
+    email = user.get("email", "")
+    token = make_token(data.username, role, employee_id, full_name, email)
     return {"token": token, "username": data.username, "role": role}
 
+
+# ── Candidate self-registration (email-based) ────────────────
+
+def register_candidate(data: CandidateRegister) -> dict:
+    # Uniqueness: block duplicate emails
+    if users_col.find_one({"email": data.email, "role": "candidate"}):
+        raise HTTPException(status_code=400, detail="An account with this email already exists")
+
+    doc = {
+        "username": data.email,          # email used as primary identifier
+        "email": data.email,
+        "full_name": data.full_name,
+        "phone": data.phone,
+        "resume": data.resume,
+        "password": hash_pw(data.password),
+        "role": "candidate",
+        "skills": [],
+        "experience": [],
+        "education": [],
+        "bio": "",
+        "location": "",
+        "createdAt": datetime.now().isoformat()
+    }
+    users_col.insert_one(doc)
+
+    # Welcome notification
+    notifications_col.insert_one({
+        "recipient": data.email,
+        "title": "Welcome to RecruiterPro!",
+        "message": f"Hi {data.full_name}, your account is ready. Start exploring jobs!",
+        "type": "success",
+        "read": False,
+        "createdAt": datetime.now().isoformat()
+    })
+
+    return {"message": "Account created successfully"}
+
+
+def login_candidate(data: CandidateLogin) -> dict:
+    user = users_col.find_one({"email": data.email, "role": "candidate"})
+
+    # Fallback: also check legacy username-based candidate account
+    if not user:
+        user = users_col.find_one({"username": "candidate", "role": "candidate"})
+        if user and data.email != "candidate":
+            user = None   # not a match for this email
+
+    if not user:
+        raise HTTPException(status_code=401, detail="No account found with this email")
+    if user["password"] != hash_pw(data.password):
+        raise HTTPException(status_code=401, detail="Incorrect password")
+
+    email = user.get("email", user.get("username"))
+    full_name = user.get("full_name", email)
+    employee_id = str(user.get("_id"))
+    token = make_token(email, "candidate", employee_id, full_name, email)
+    return {
+        "token": token,
+        "username": email,
+        "email": email,
+        "full_name": full_name,
+        "role": "candidate"
+    }
+
+
+# ── Forgot / Reset password (email-based) ────────────────────
+# Simple token stored in DB — no SMTP required for demo; token shown in response
+# In production, email the reset link.
+
+def forgot_password(email: str) -> dict:
+    user = users_col.find_one({"email": email, "role": "candidate"})
+    if not user:
+        # Return generic message to avoid user enumeration
+        return {"message": "If an account exists, a reset link has been sent."}
+
+    reset_token = secrets.token_urlsafe(32)
+    expiry = int(time.time()) + 3600  # 1 hour
+
+    users_col.update_one(
+        {"email": email},
+        {"$set": {"reset_token": reset_token, "reset_token_exp": expiry}}
+    )
+
+    # In production: send email. For demo, return token directly.
+    return {
+        "message": "Password reset token generated.",
+        "reset_token": reset_token   # Remove this in production; send via email
+    }
+
+
+def reset_password(token: str, new_password: str) -> dict:
+    user = users_col.find_one({"reset_token": token})
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    if user.get("reset_token_exp", 0) < time.time():
+        raise HTTPException(status_code=400, detail="Reset token has expired")
+
+    users_col.update_one(
+        {"reset_token": token},
+        {"$set": {"password": hash_pw(new_password)},
+         "$unset": {"reset_token": "", "reset_token_exp": ""}}
+    )
+    return {"message": "Password updated successfully"}
+
+
+# ── Seed default users ────────────────────────────────────────
+
 def seed_admin():
-    from config.db import employees_col
+    from config.db import employees_col, jobs_col, candidates_col
+
+    # Admin
     if employees_col.count_documents({"email": "admin@hrpro.com"}) == 0:
         admin_res = employees_col.insert_one({
-            "name": "Admin User", 
-            "email": "admin@hrpro.com", 
-            "role": "admin", 
+            "name": "Admin User",
+            "email": "admin@hrpro.com",
+            "role": "admin",
             "department": "Management",
             "createdAt": datetime.now().isoformat()
         })
         users_col.insert_one({
-            "username": "admin", 
-            "password": hash_pw("admin123"), 
+            "username": "admin",
+            "password": hash_pw("admin123"),
             "role": "admin",
-            "employee_id": str(admin_res.inserted_id)
+            "employee_id": str(admin_res.inserted_id),
+            "createdAt": datetime.now().isoformat()
         })
-        print("✅ Admin Employee & User created")
-    
+        print("✅ Admin created: admin / admin123")
+
+    # Default employee
     if employees_col.count_documents({"email": "user@hrpro.com"}) == 0:
         user_res = employees_col.insert_one({
-            "name": "Default Employee", 
-            "email": "user@hrpro.com", 
-            "role": "employee", 
+            "name": "Default Employee",
+            "email": "user@hrpro.com",
+            "role": "employee",
             "department": "Engineering",
             "createdAt": datetime.now().isoformat()
         })
         users_col.insert_one({
-            "username": "user", 
-            "password": hash_pw("user123"), 
+            "username": "user",
+            "password": hash_pw("user123"),
             "role": "employee",
-            "employee_id": str(user_res.inserted_id)
+            "employee_id": str(user_res.inserted_id),
+            "createdAt": datetime.now().isoformat()
         })
-        print("✅ Default Employee & User created")
+        print("✅ Employee created: user / user123")
+
+    # Demo candidate (legacy username account for demo button)
     if users_col.count_documents({"username": "candidate"}) == 0:
         users_col.insert_one({
-            "username": "candidate", 
-            "password": hash_pw("candidate123"), 
-            "role": "candidate"
+            "username": "candidate",
+            "email": "candidate@demo.com",
+            "full_name": "Demo Candidate",
+            "password": hash_pw("candidate123"),
+            "role": "candidate",
+            "skills": ["React", "Python"],
+            "experience": ["2 years at TechCorp as Frontend Dev"],
+            "education": ["B.Tech Computer Science, 2022"],
+            "bio": "Passionate developer looking for opportunities.",
+            "location": "Bangalore",
+            "createdAt": datetime.now().isoformat()
         })
-        print("✅ Candidate created: candidate | candidate123")
-    
-    from config.db import candidates_col, jobs_col
+        print("✅ Demo candidate: candidate@demo.com / candidate123")
+
+    # Sample jobs
     if jobs_col.count_documents({}) == 0:
         jobs = [
-            {"title": "Frontend Developer", "department": "Engineering", "location": "Bangalore", "type": "Full-time", "status": "Open", "createdAt": datetime.now().isoformat()},
-            {"title": "Backend Developer", "department": "Engineering", "location": "Remote", "type": "Full-time", "status": "Open", "createdAt": datetime.now().isoformat()},
-            {"title": "UI/UX Designer", "department": "Design", "location": "Bangalore", "type": "Contract", "status": "Open", "createdAt": datetime.now().isoformat()}
+            {"title": "Frontend Developer", "department": "Engineering",
+             "location": "Bangalore", "type": "Full-time", "status": "Open",
+             "salary": "₹8-12 LPA", "required_skills": "React, CSS, JavaScript",
+             "createdAt": datetime.now().isoformat()},
+            {"title": "Backend Developer", "department": "Engineering",
+             "location": "Remote", "type": "Full-time", "status": "Open",
+             "salary": "₹10-15 LPA", "required_skills": "Python, FastAPI, MongoDB",
+             "createdAt": datetime.now().isoformat()},
+            {"title": "UI/UX Designer", "department": "Design",
+             "location": "Bangalore", "type": "Contract", "status": "Open",
+             "salary": "₹6-10 LPA", "required_skills": "Figma, Adobe XD",
+             "createdAt": datetime.now().isoformat()}
         ]
         jobs_col.insert_many(jobs)
         print("✅ Sample jobs seeded")
 
+    # Sample candidates
     if candidates_col.count_documents({}) == 0:
-        # Get job IDs safely
-        fe_job = jobs_col.find_one({"title": "Frontend Developer"}) or {"_id": "fe_id"}
-        be_job = jobs_col.find_one({"title": "Backend Developer"}) or {"_id": "be_id"}
-        ui_job = jobs_col.find_one({"title": "UI/UX Designer"}) or {"_id": "ui_id"}
-        
-        candidates = [
-            {"name": "Aditya Verma", "email": "aditya@example.com", "job_id": str(fe_job.get("_id")), "stage": "Applied", "skills": "React, CSS", "createdAt": datetime.now().isoformat()},
-            {"name": "Sneha Rao", "email": "sneha@example.com", "job_id": str(be_job.get("_id")), "stage": "Shortlisted", "skills": "Python, FastAPI", "createdAt": datetime.now().isoformat()},
-            {"name": "John Doe", "email": "john@example.com", "job_id": str(ui_job.get("_id")), "stage": "Interview", "skills": "Figma, Adobe XD", "createdAt": datetime.now().isoformat()},
-            {"name": "Laksh", "email": "laksh@example.com", "job_id": str(fe_job.get("_id")), "stage": "Applied", "skills": "JavaScript, Tailwind", "createdAt": datetime.now().isoformat()}
-        ]
-        candidates_col.insert_many(candidates)
-        print("✅ Sample candidates seeded (including Laksh)")
+        fe = jobs_col.find_one({"title": "Frontend Developer"}) or {"_id": "fe"}
+        be = jobs_col.find_one({"title": "Backend Developer"}) or {"_id": "be"}
+        ui = jobs_col.find_one({"title": "UI/UX Designer"}) or {"_id": "ui"}
+        candidates_col.insert_many([
+            {"name": "Aditya Verma", "email": "aditya@example.com",
+             "job_id": str(fe["_id"]), "stage": "Applied", "createdAt": datetime.now().isoformat()},
+            {"name": "Sneha Rao",    "email": "sneha@example.com",
+             "job_id": str(be["_id"]), "stage": "Shortlisted", "createdAt": datetime.now().isoformat()},
+            {"name": "John Doe",     "email": "john@example.com",
+             "job_id": str(ui["_id"]), "stage": "Interview",   "createdAt": datetime.now().isoformat()},
+        ])
+        print("✅ Sample pipeline candidates seeded")

@@ -150,7 +150,7 @@ export default function InterviewForm({ employees, preselectedEmployee, onSave, 
             <label>Meeting Link <span className="label-hint">(Google Meet / Zoom)</span></label>
             <div className="meet-row">
               <input
-                type="url"
+                type="text"
                 placeholder="Paste meeting link or generate one →"
                 value={meetLink}
                 onChange={e=>setMeetLink(e.target.value)}

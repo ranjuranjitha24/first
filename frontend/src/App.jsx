@@ -1,91 +1,151 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { getCurrentUser } from './services/api'
-import Sidebar from './components/Sidebar'
-import TopNav from './components/TopNav'
-import AIAssistant from './components/AIAssistant'
-import Dashboard from './pages/Dashboard'
-import Employees from './pages/Employees'
-import Interviews from './pages/Interviews'
-import Jobs from './pages/Jobs'
-import Candidates from './pages/Candidates'
-import Leaves from './pages/Leaves'
-import Meetings from './pages/Meetings'
-import Reviews from './pages/Reviews'
-import Login from './pages/Login'
-import Careers from './pages/Careers'
-import Analytics from './pages/Analytics'
-import Attendance from './pages/Attendance'
-import Profile from './pages/Profile'
-import Payroll from './pages/Payroll'
-import CandidateDashboard from './pages/CandidateDashboard'
-import Notifications from './pages/Notifications'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
+import { useEffect }       from 'react'
+import { SessionProvider, useSession } from './context/SessionContext'
+import { getToken }        from './services/session'
 
+import Sidebar          from './components/Sidebar'
+import TopNav           from './components/TopNav'
+import AIAssistant      from './components/AIAssistant'
+
+import Dashboard        from './pages/Dashboard'
+import Employees        from './pages/Employees'
+import Interviews       from './pages/Interviews'
+import Jobs             from './pages/Jobs'
+import Candidates       from './pages/Candidates'
+import Leaves           from './pages/Leaves'
+import Meetings         from './pages/Meetings'
+import Reviews          from './pages/Reviews'
+import Analytics        from './pages/Analytics'
+import Attendance       from './pages/Attendance'
+import Profile          from './pages/Profile'
+import Payroll          from './pages/Payroll'
+import Notifications    from './pages/Notifications'
+import CandidateDashboard from './pages/CandidateDashboard'
+import Careers          from './pages/Careers'
+import Login            from './pages/Login'
+import Register         from './pages/Register'
+import ForgotPassword   from './pages/ForgotPassword'
+
+// ── Route Guards ──────────────────────────────────────────────────────────
+
+/**
+ * ProtectedRoute — blocks access if no valid (non-expired) token exists.
+ * Re-evaluates on every render so expiry is caught immediately.
+ */
 function ProtectedRoute({ children }) {
-  const token = localStorage.getItem('hr_token')
-  return token ? children : <Navigate to="/login" replace />
+  const token = getToken()                    // validates expiry
+  const location = useLocation()
+  if (!token) {
+    return <Navigate to="/login" replace state={{ from: location }} />
+  }
+  return children
 }
 
+/**
+ * RoleRoute — ensures the user's role matches the allowed list.
+ * Falls back to the correct dashboard for the actual role.
+ */
 function RoleRoute({ roles, children }) {
-  const user = getCurrentUser()
+  const { user } = useSession()
   if (!user) return <Navigate to="/login" replace />
   if (!roles.includes(user.role)) {
     if (user.role === 'admin' || user.role === 'hr') return <Navigate to="/admin/dashboard" replace />
-    if (user.role === 'employee') return <Navigate to="/employee/dashboard" replace />
+    if (user.role === 'employee')                    return <Navigate to="/employee/dashboard" replace />
     return <Navigate to="/candidate/dashboard" replace />
   }
   return children
 }
 
+/**
+ * GuestRoute — prevents logged-in users from viewing public-only pages.
+ */
+function GuestRoute({ children }) {
+  const token = getToken()
+  const { user } = useSession()
+  if (token && user) {
+    if (user.role === 'admin' || user.role === 'hr') return <Navigate to="/admin/dashboard" replace />
+    if (user.role === 'employee')                    return <Navigate to="/employee/dashboard" replace />
+    return <Navigate to="/candidate/dashboard" replace />
+  }
+  return children
+}
+
+// ── Login page — shows session-expired/inactivity message if sent ─────────
+function LoginPage() {
+  const location  = useLocation()
+  const navigate  = useNavigate()
+  const reason    = location.state?.reason || new URLSearchParams(location.search).get('reason')
+  const { login } = useSession()
+  return <Login reason={reason} onLogin={login} navigate={navigate} />
+}
+
+// ── Shell (authenticated layout) ─────────────────────────────────────────
+function AppShell() {
+  return (
+    <div className="app-layout">
+      <Sidebar />
+      <main className="main-content">
+        <TopNav />
+        <AIAssistant />
+        <Routes>
+          {/* Default redirect */}
+          <Route path="/" element={<RoleRoute roles={['admin','hr']}><Navigate to="/admin/dashboard" replace /></RoleRoute>} />
+
+          {/* Admin / HR */}
+          <Route path="/admin/dashboard" element={<RoleRoute roles={['admin','hr']}><Dashboard /></RoleRoute>} />
+          <Route path="/analytics"       element={<RoleRoute roles={['admin','hr']}><Analytics /></RoleRoute>} />
+          <Route path="/employees"       element={<RoleRoute roles={['admin','hr']}><Employees /></RoleRoute>} />
+          <Route path="/jobs"            element={<RoleRoute roles={['admin','hr']}><Jobs /></RoleRoute>} />
+          <Route path="/candidates"      element={<RoleRoute roles={['admin','hr']}><Candidates /></RoleRoute>} />
+          <Route path="/settings"        element={<RoleRoute roles={['admin','hr']}><Profile /></RoleRoute>} />
+
+          {/* Employee */}
+          <Route path="/employee/dashboard" element={<RoleRoute roles={['employee']}><Dashboard /></RoleRoute>} />
+          <Route path="/attendance"         element={<RoleRoute roles={['admin','hr','employee']}><Attendance /></RoleRoute>} />
+          <Route path="/payroll"            element={<RoleRoute roles={['admin','hr','employee']}><Payroll /></RoleRoute>} />
+
+          {/* Candidate */}
+          <Route path="/candidate/dashboard" element={<RoleRoute roles={['candidate']}><CandidateDashboard /></RoleRoute>} />
+          <Route path="/jobs/available"      element={<RoleRoute roles={['candidate']}><Careers /></RoleRoute>} />
+          <Route path="/applications"        element={<RoleRoute roles={['candidate']}><CandidateDashboard /></RoleRoute>} />
+
+          {/* Shared */}
+          <Route path="/interviews"   element={<RoleRoute roles={['admin','hr','employee','candidate']}><Interviews /></RoleRoute>} />
+          <Route path="/leaves"       element={<RoleRoute roles={['admin','hr','employee']}><Leaves /></RoleRoute>} />
+          <Route path="/meetings"     element={<RoleRoute roles={['admin','hr','employee']}><Meetings /></RoleRoute>} />
+          <Route path="/reviews"      element={<RoleRoute roles={['admin','hr','employee']}><Reviews /></RoleRoute>} />
+          <Route path="/profile"      element={<RoleRoute roles={['admin','hr','employee','candidate']}><Profile /></RoleRoute>} />
+          <Route path="/notifications" element={<RoleRoute roles={['admin','hr','employee','candidate']}><Notifications /></RoleRoute>} />
+
+          <Route path="/dashboard"    element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
+    </div>
+  )
+}
+
+// ── Root App ──────────────────────────────────────────────────────────────
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/careers" element={getCurrentUser() ? <Navigate to="/jobs/available" replace /> : <Careers />} />
-        <Route path="/*" element={
-          <ProtectedRoute>
-            <div className="app-layout">
-              <Sidebar />
-              <main className="main-content">
-                <TopNav />
-                <AIAssistant />
-                <Routes>
-                  <Route path="/" element={<RoleRoute roles={['admin','hr']}><Navigate to="/admin/dashboard" replace /></RoleRoute>} />
-                  
-                  {/* Admin / HR Routes */}
-                  <Route path="/admin/dashboard" element={<RoleRoute roles={['admin','hr']}><Dashboard /></RoleRoute>} />
-                  <Route path="/analytics"  element={<RoleRoute roles={['admin','hr']}><Analytics /></RoleRoute>} />
-                  <Route path="/employees"  element={<RoleRoute roles={['admin','hr']}><Employees /></RoleRoute>} />
-                  <Route path="/jobs"       element={<RoleRoute roles={['admin','hr']}><Jobs /></RoleRoute>} />
-                  <Route path="/candidates" element={<RoleRoute roles={['admin','hr']}><Candidates /></RoleRoute>} />
-                  <Route path="/settings"   element={<RoleRoute roles={['admin','hr']}><Profile /></RoleRoute>} />
-                  
-                  {/* Employee Routes */}
-                  <Route path="/employee/dashboard" element={<RoleRoute roles={['employee']}><Dashboard /></RoleRoute>} />
-                  <Route path="/attendance" element={<RoleRoute roles={['admin','hr','employee']}><Attendance /></RoleRoute>} />
-                  <Route path="/payroll"    element={<RoleRoute roles={['admin','hr','employee']}><Payroll /></RoleRoute>} />
-                  
-                  {/* Candidate Routes */}
-                  <Route path="/candidate/dashboard" element={<RoleRoute roles={['candidate']}><CandidateDashboard /></RoleRoute>} />
-                  <Route path="/jobs/available"      element={<RoleRoute roles={['candidate']}><Careers /></RoleRoute>} />
-                  <Route path="/applications"        element={<RoleRoute roles={['candidate']}><CandidateDashboard /></RoleRoute>} />
+      <SessionProvider>
+        <Routes>
+          {/* Public routes — redirect to dashboard if already logged in */}
+          <Route path="/login"           element={<GuestRoute><LoginPage /></GuestRoute>} />
+          <Route path="/register"        element={<GuestRoute><Register /></GuestRoute>} />
+          <Route path="/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
 
-                  
-                  {/* Shared Routes */}
-                  <Route path="/interviews" element={<RoleRoute roles={['admin','hr','employee','candidate']}><Interviews /></RoleRoute>} />
-                  <Route path="/leaves"     element={<RoleRoute roles={['admin','hr','employee']}><Leaves /></RoleRoute>} />
-                  <Route path="/meetings"   element={<RoleRoute roles={['admin','hr','employee']}><Meetings /></RoleRoute>} />
-                  <Route path="/reviews"    element={<RoleRoute roles={['admin','hr','employee']}><Reviews /></RoleRoute>} />
-                  <Route path="/profile"    element={<RoleRoute roles={['admin','hr','employee','candidate']}><Profile /></RoleRoute>} />
-                  <Route path="/notifications" element={<RoleRoute roles={['admin','hr','employee','candidate']}><Notifications /></RoleRoute>} />
-                  
-                  <Route path="/dashboard" element={<Navigate to="/" replace />} />
-                </Routes>
-              </main>
-            </div>
-          </ProtectedRoute>
-        } />
-      </Routes>
+          {/* /careers — public, but logged-in candidates go to /jobs/available */}
+          <Route path="/careers" element={<GuestRoute><Careers /></GuestRoute>} />
+
+          {/* All authenticated routes */}
+          <Route path="/*" element={
+            <ProtectedRoute>
+              <AppShell />
+            </ProtectedRoute>
+          } />
+        </Routes>
+      </SessionProvider>
     </BrowserRouter>
   )
 }

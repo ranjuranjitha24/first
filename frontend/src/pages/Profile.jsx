@@ -1,117 +1,191 @@
-import { useState } from 'react'
-import { getCurrentUser } from '../services/api'
+import { useState, useEffect } from 'react'
+import { getCurrentUser, getCandidateProfile, updateCandidateProfile } from '../services/api'
 
 export default function Profile() {
   const user = getCurrentUser() || {}
+  const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [profile, setProfile] = useState({
-    name: user.username || 'John Doe',
-    email: 'john.doe@company.com',
-    phone: '+91 98765 43210',
-    department: 'Engineering',
-    role: user.role || 'employee',
-    joinDate: 'Jan 15, 2024',
-    address: '123 Tech Park, Bangalore',
-    emergencyContact: 'Jane Doe (+91 99887 76655)'
+    username: user.username || '',
+    phone: '',
+    location: '',
+    bio: '',
+    skills: [],
+    experience: [],
+    education: [],
+    resume: ''
   })
 
-  const initial = profile.name[0].toUpperCase()
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        if (user.role === 'candidate') {
+          const res = await getCandidateProfile()
+          setProfile(res.data.data)
+        } else {
+          // Default profile for employees/admins (kept simple for this task)
+          setProfile(p => ({ ...p, username: user.username }))
+        }
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchProfile()
+  }, [user.role, user.username])
+
+  const handleSave = async () => {
+    try {
+      setLoading(true)
+      await updateCandidateProfile(profile)
+      alert('✅ Profile updated successfully!')
+      setIsEditing(false)
+    } catch (e) {
+      alert('Failed to update profile.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const addItem = (field) => {
+    setProfile({ ...profile, [field]: [...profile[field], ''] })
+  }
+
+  const updateItem = (field, index, value) => {
+    const newList = [...profile[field]]
+    newList[index] = value
+    setProfile({ ...profile, [field]: newList })
+  }
+
+  if (loading && !profile.username) return <div className="page-content">Loading profile...</div>
 
   return (
     <div className="page-content page-fade-in">
       <div className="page-header">
         <div>
           <h1 className="page-title">My Profile</h1>
-          <p className="page-sub">View and manage your personal information</p>
+          <p className="page-sub">Manage your professional identity and resume</p>
         </div>
-        <button className="btn-primary" onClick={() => setIsEditing(!isEditing)}>
+        <button className="btn-primary" onClick={() => isEditing ? handleSave() : setIsEditing(true)}>
           {isEditing ? '💾 Save Changes' : '✏️ Edit Profile'}
         </button>
       </div>
 
       <div className="dashboard-grid">
-        {/* Profile Card */}
-        <div className="card" style={{ gridColumn: 'span 1' }}>
+        <div className="card glass" style={{ gridColumn: 'span 1' }}>
           <div style={{ padding: '40px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-            <div className="avatar" style={{ width: 100, height: 100, fontSize: 36, marginBottom: 20 }}>{initial}</div>
-            <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>{profile.name}</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: 14, textTransform: 'capitalize', fontWeight: 600 }}>{profile.role} · {profile.department}</p>
-            <div className="dropdown-divider" style={{ width: '100%', margin: '24px 0' }}></div>
-            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: 'var(--text-muted)' }}>Status</span>
-                <span className="status-badge success"><span className="status-dot"></span> Active</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: 'var(--text-muted)' }}>ID</span>
-                <span style={{ fontWeight: 600 }}>EMP-2024-089</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: 'var(--text-muted)' }}>Member Since</span>
-                <span style={{ fontWeight: 600 }}>{profile.joinDate}</span>
-              </div>
+            <div className="avatar" style={{ width: 100, height: 100, fontSize: 36, marginBottom: 20 }}>
+              {profile.username[0]?.toUpperCase()}
             </div>
+            <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>{profile.username}</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: 14, textTransform: 'capitalize', fontWeight: 600 }}>
+              {user.role} {profile.location && `· ${profile.location}`}
+            </p>
+            <div className="dropdown-divider" style={{ width: '100%', margin: '24px 0' }}></div>
+            
+            {isEditing ? (
+              <div style={{ width: '100%', textAlign: 'left' }}>
+                <label style={{ fontSize: 12, fontWeight: 700 }}>Bio</label>
+                <textarea 
+                  className="filter-input" 
+                  style={{ width: '100%', marginTop: 8 }} 
+                  value={profile.bio} 
+                  onChange={e => setProfile({...profile, bio: e.target.value})}
+                />
+              </div>
+            ) : (
+              <p style={{ fontSize: 14, opacity: 0.8 }}>{profile.bio || 'No bio provided yet.'}</p>
+            )}
           </div>
         </div>
 
-        {/* Info Tabs */}
-        <div className="card" style={{ gridColumn: 'span 2' }}>
+        <div className="card glass" style={{ gridColumn: 'span 2' }}>
           <div className="card-header">
-            <h3>Personal Information</h3>
+            <h3>Contact & Details</h3>
           </div>
           <div style={{ padding: '24px' }}>
             <div className="form-grid">
-              <div className="form-group">
-                <label>Full Name</label>
-                <input value={profile.name} disabled={!isEditing} onChange={e => setProfile({...profile, name: e.target.value})} />
-              </div>
-              <div className="form-group">
-                <label>Email Address</label>
-                <input value={profile.email} disabled={!isEditing} onChange={e => setProfile({...profile, email: e.target.value})} />
-              </div>
               <div className="form-group">
                 <label>Phone Number</label>
                 <input value={profile.phone} disabled={!isEditing} onChange={e => setProfile({...profile, phone: e.target.value})} />
               </div>
               <div className="form-group">
-                <label>Department</label>
-                <input value={profile.department} disabled />
+                <label>Location</label>
+                <input value={profile.location} disabled={!isEditing} onChange={e => setProfile({...profile, location: e.target.value})} />
               </div>
               <div className="form-group full-width">
-                <label>Office Address</label>
-                <textarea value={profile.address} disabled={!isEditing} rows={2} onChange={e => setProfile({...profile, address: e.target.value})} />
-              </div>
-              <div className="form-group full-width">
-                <label>Emergency Contact</label>
-                <input value={profile.emergencyContact} disabled={!isEditing} onChange={e => setProfile({...profile, emergencyContact: e.target.value})} />
+                <label>Resume Link</label>
+                <input 
+                  type="text"
+                  value={profile.resume} 
+                  disabled={!isEditing} 
+                  onChange={e => setProfile({...profile, resume: e.target.value})} 
+                  placeholder="e.g., https://drive.google.com/..." 
+                />
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="card" style={{ marginTop: 24 }}>
-        <div className="card-header">
-          <h3>Security Settings</h3>
-        </div>
-        <div style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <p style={{ fontWeight: 600, fontSize: 14 }}>Change Password</p>
-              <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>It's a good idea to use a strong password that you don't use elsewhere.</p>
+      {user.role === 'candidate' && (
+        <div className="dashboard-grid" style={{ marginTop: 24 }}>
+          <div className="card glass">
+            <div className="card-header">
+              <h3>Skills</h3>
+              {isEditing && <button className="btn-icon" onClick={() => addItem('skills')}>➕</button>}
             </div>
-            <button className="btn-secondary">Update Password</button>
-          </div>
-          <div className="dropdown-divider" style={{ margin: '20px 0' }}></div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <p style={{ fontWeight: 600, fontSize: 14 }}>Two-Factor Authentication</p>
-              <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Add an extra layer of security to your account.</p>
+            <div style={{ padding: 24 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {profile.skills.map((s, i) => (
+                  isEditing ? (
+                    <input key={i} value={s} onChange={e => updateItem('skills', i, e.target.value)} style={{ width: 'auto', display: 'inline-block' }} />
+                  ) : (
+                    <span key={i} className="skill-tag">{s}</span>
+                  )
+                ))}
+              </div>
             </div>
-            <button className="btn-outline">Enable 2FA</button>
+          </div>
+
+          <div className="card glass">
+            <div className="card-header">
+              <h3>Experience</h3>
+              {isEditing && <button className="btn-icon" onClick={() => addItem('experience')}>➕</button>}
+            </div>
+            <div style={{ padding: 24 }}>
+              {profile.experience.map((exp, i) => (
+                <div key={i} style={{ marginBottom: 12 }}>
+                  {isEditing ? (
+                    <input value={exp} onChange={e => updateItem('experience', i, e.target.value)} />
+                  ) : (
+                    <p style={{ fontSize: 14 }}>• {exp}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card glass">
+            <div className="card-header">
+              <h3>Education</h3>
+              {isEditing && <button className="btn-icon" onClick={() => addItem('education')}>➕</button>}
+            </div>
+            <div style={{ padding: 24 }}>
+              {profile.education.map((edu, i) => (
+                <div key={i} style={{ marginBottom: 12 }}>
+                  {isEditing ? (
+                    <input value={edu} onChange={e => updateItem('education', i, e.target.value)} />
+                  ) : (
+                    <p style={{ fontSize: 14 }}>• {edu}</p>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

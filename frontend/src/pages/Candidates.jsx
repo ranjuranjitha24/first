@@ -187,7 +187,15 @@ export default function Candidates() {
                     {jobs.map(j => <option key={j._id} value={j._id}>{j.title}</option>)}
                   </select>
                 </div>
-                <div className="form-group"><label>Resume Link</label><input value={form.resume_link} onChange={e => setForm({ ...form, resume_link: e.target.value })} placeholder="https://..." /></div>
+                <div className="form-group">
+                  <label>Resume Link</label>
+                  <input 
+                    type="text"
+                    value={form.resume_link} 
+                    onChange={e => setForm({ ...form, resume_link: e.target.value })} 
+                    placeholder="e.g., https://drive.google.com/..." 
+                  />
+                </div>
               </div>
               <div className="form-actions" style={{ marginTop: 24 }}>
                 <button type="button" className="btn-outline" onClick={() => setShowModal(false)}>Cancel</button>

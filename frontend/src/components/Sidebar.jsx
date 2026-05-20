@@ -1,7 +1,7 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import ThemeToggle from './ThemeToggle'
-import { getCurrentUser } from '../services/api'
+import { useSession } from '../context/SessionContext'
 
 const allNavItems = [
   // Shared / Role-specific
@@ -29,23 +29,21 @@ const allNavItems = [
 ]
 
 export default function Sidebar() {
-  const navigate = useNavigate()
+  const { user: sessionUser, logout: sessionLogout } = useSession()
   const [isCollapsed, setIsCollapsed] = useState(false)
   
-  const user = getCurrentUser() || {}
+  const user = sessionUser || {}
   const role = user.role || 'hr'
 
   useEffect(() => {
     document.documentElement.style.setProperty('--sidebar-w', isCollapsed ? '88px' : '260px');
   }, [isCollapsed])
 
-  const logout = () => {
-    localStorage.removeItem('hr_token')
-    navigate('/login')
-  }
+  const logout = () => sessionLogout('manual')
 
   const navItems = allNavItems.filter(i => i.roles.includes(role))
-  const initial = (user.username || 'HR')[0].toUpperCase()
+  const displayName = user.full_name || user.username || 'HR Manager'
+  const initial = displayName[0].toUpperCase()
 
   return (
     <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
@@ -81,7 +79,7 @@ export default function Sidebar() {
           <div className="user-avatar">{initial}</div>
           {!isCollapsed && (
             <div className="user-info">
-              <div className="user-name">{user.username || 'HR Manager'}</div>
+              <div className="user-name">{displayName}</div>
               <div className="user-role">{role}</div>
             </div>
           )}

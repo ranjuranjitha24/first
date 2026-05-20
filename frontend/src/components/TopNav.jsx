@@ -1,83 +1,94 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getNotifications, getUnreadCount, markRead, markAllRead, getCurrentUser } from '../services/api'
+import { getNotifications, getPortalNotifications, getUnreadCount, markRead, markAllRead } from '../services/api'
+import { useSession } from '../context/SessionContext'
 
 export default function TopNav() {
   const [showNotif, setShowNotif] = useState(false)
   const [notifications, setNotifications] = useState([])
-  const [unreadCount, setUnreadCount] = useState(0)
+  const [unreadCount,   setUnreadCount]   = useState(0)
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' })
   const notifRef = useRef(null)
   const navigate = useNavigate()
-  const user = getCurrentUser() || {}
 
+  // ── Session data from context ──────────────────────────────────────────
+  const { user, logout } = useSession()
+
+  // ── Notifications ──────────────────────────────────────────────────────
   const fetchNotifs = async () => {
+    if (!user) return   // skip if session already cleared
     try {
+      const isCandidate = user.role === 'candidate'
       const [notifRes, countRes] = await Promise.all([
-        getNotifications(),
-        getUnreadCount()
+        isCandidate ? getPortalNotifications() : getNotifications(),
+        isCandidate ? Promise.resolve({ data: { count: 0 } }) : getUnreadCount()
       ])
-      
+
       const newCount = countRes.data.count
       if (newCount > unreadCount && unreadCount !== 0) {
-        const latest = notifRes.data.data[0]
+        const latest = notifRes.data.data?.[0]
         if (latest) {
-          setToast({ show: true, msg: `🔔 ${latest.title}: ${latest.message}`, type: latest.type === 'danger' ? 'danger' : 'success' })
+          setToast({
+            show: true,
+            msg: `🔔 ${latest.title}: ${latest.message}`,
+            type: latest.type === 'danger' ? 'danger' : 'success'
+          })
           setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 5000)
         }
       }
-      
-      setNotifications(notifRes.data.data)
+
+      setNotifications(notifRes.data.data ?? [])
       setUnreadCount(newCount)
-    } catch (e) {
-      console.error('Failed to fetch notifications')
+    } catch {
+      // Silently ignore — 401 will be handled by the axios interceptor
     }
   }
 
   useEffect(() => {
     fetchNotifs()
-    const interval = setInterval(fetchNotifs, 10000) // Poll every 10s
-    return () => clearInterval(interval)
-  }, [])
+    const id = setInterval(fetchNotifs, 10_000)
+    return () => clearInterval(id)
+  }, [user?.username]) // restart when user changes
 
+  // Close dropdown on outside click
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (notifRef.current && !notifRef.current.contains(event.target)) {
-        setShowNotif(false)
-      }
+    const handler = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotif(false)
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
   }, [])
 
   const handleMarkRead = async (id) => {
-    try {
-      await markRead(id)
-      fetchNotifs()
-    } catch (e) {}
+    try { await markRead(id); fetchNotifs() } catch { /* ignore */ }
   }
 
   const handleMarkAllRead = async () => {
-    try {
-      await markAllRead()
-      fetchNotifs()
-    } catch (e) {}
+    try { await markAllRead(); fetchNotifs() } catch { /* ignore */ }
   }
+
+  const displayName = user?.full_name || user?.username || 'HR Admin'
+  const initial     = displayName.charAt(0).toUpperCase()
 
   return (
     <nav className="top-nav">
+      {/* Toast notification popup */}
       {toast.show && (
-        <div className={`toast show ${toast.type} glass`} style={{ position: 'fixed', top: 80, right: 24, zIndex: 10002, width: 'auto', maxWidth: 400 }}>
+        <div
+          className={`toast show ${toast.type}`}
+          style={{ position: 'fixed', top: 80, right: 24, zIndex: 10002, maxWidth: 400 }}
+        >
           {toast.msg}
         </div>
       )}
+
       <div className="search-bar">
         <span className="search-icon">🔍</span>
-        <input type="text" placeholder="Search for employees, jobs, or documents..." />
+        <input type="text" placeholder="Search employees, jobs, documents…" />
       </div>
 
       <div className="nav-actions">
-        {/* Notifications */}
+        {/* Notifications bell */}
         <div className="nav-icon-wrapper" ref={notifRef}>
           <button className="nav-icon-btn" onClick={() => setShowNotif(!showNotif)}>
             🔔
@@ -95,9 +106,9 @@ export default function TopNav() {
                   <div className="notif-empty">No new notifications</div>
                 ) : (
                   notifications.map(n => (
-                    <div 
-                      key={n._id} 
-                      className={`notif-item ${n.is_read ? '' : 'unread'} ${n.type}`}
+                    <div
+                      key={n._id}
+                      className={`notif-item ${n.is_read || n.read ? '' : 'unread'} ${n.type}`}
                       onClick={() => handleMarkRead(n._id)}
                     >
                       <div className="notif-icon-circle">
@@ -106,30 +117,40 @@ export default function TopNav() {
                       <div className="notif-content">
                         <div className="notif-title">{n.title}</div>
                         <div className="notif-message">{n.message}</div>
-                        <div className="notif-time">{new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                        <div className="notif-time">
+                          {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
                       </div>
-                      {!n.is_read && <div className="unread-dot"></div>}
+                      {!(n.is_read || n.read) && <div className="unread-dot"></div>}
                     </div>
                   ))
                 )}
               </div>
               <div className="notif-footer">
-                <button onClick={() => { setShowNotif(false); navigate('/notifications') }}>View all history</button>
+                <button onClick={() => { setShowNotif(false); navigate('/notifications') }}>
+                  View all history
+                </button>
               </div>
             </div>
           )}
         </div>
 
-        <button className="nav-icon-btn">⚙️</button>
-        
+        {/* Session logout shortcut */}
+        <button
+          className="nav-icon-btn"
+          title="Logout"
+          onClick={() => logout('manual')}
+        >
+          🚪
+        </button>
+
+        {/* Profile trigger */}
         <div className="profile-trigger" onClick={() => navigate('/profile')}>
           <div className="nav-user-info">
-            <span className="nav-user-name">{user.name || 'HR Admin'}</span>
-            <span className="nav-user-role">{user.role?.toUpperCase() || 'ADMIN'}</span>
+            <span className="nav-user-name">{displayName}</span>
+            <span className="nav-user-role">{user?.role?.toUpperCase() || 'USER'}</span>
           </div>
-          <div className="user-avatar">
-            {user.name?.charAt(0) || 'A'}
-          </div>
+          <div className="user-avatar">{initial}</div>
         </div>
       </div>
     </nav>
