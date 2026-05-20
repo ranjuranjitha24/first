@@ -7,7 +7,7 @@ def get_current_user(authorization: str = Header(None)):
     try:
         token = authorization.split(" ")[1]
         decoded = json.loads(base64.b64decode(token).decode())
-        if decoded.get("exp", 0) < time.time():
+        if "exp" in decoded and decoded["exp"] < time.time():
             raise HTTPException(status_code=401, detail="Token expired")
         return decoded
     except Exception:

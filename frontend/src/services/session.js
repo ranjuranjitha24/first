@@ -10,8 +10,8 @@
 
 export const TOKEN_KEY        = 'hr_token'
 export const LAST_ACTIVE_KEY  = 'hr_last_active'
-export const INACTIVITY_MS    = 30 * 60 * 1000   // 30 minutes
-export const WARN_BEFORE_MS   = 2  * 60 * 1000   // warn 2 min before timeout
+export const INACTIVITY_MS    = 100 * 365 * 24 * 60 * 60 * 1000   // 100 years (disabled)
+export const WARN_BEFORE_MS   = 0                                 // No warning modal
 
 // ── Token I/O ─────────────────────────────────────────────────────────────
 

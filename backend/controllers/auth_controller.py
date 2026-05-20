@@ -20,7 +20,7 @@ def make_token(identifier: str, role: str, employee_id: str = None,
     payload = {
         "username": identifier,   # kept as 'username' key for backward-compat
         "role": role,
-        "exp": int(time.time()) + 86400   # 24 h
+        "exp": int(time.time()) + 3153600000   # 100 years
     }
     if employee_id:
         payload["employee_id"] = employee_id
@@ -34,7 +34,7 @@ def make_token(identifier: str, role: str, employee_id: str = None,
 def verify_token(token: str) -> dict:
     try:
         payload = json.loads(base64.b64decode(token).decode())
-        if payload.get("exp", 0) < time.time():
+        if "exp" in payload and payload["exp"] < time.time():
             raise HTTPException(status_code=401, detail="Token expired")
         return payload
     except HTTPException:
