@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 from models.job_model import JobCreate, JobUpdate
 import controllers.job_controller as ctrl
 from dependencies import check_admin, get_current_user_required
