@@ -4,34 +4,41 @@ from models.review_model import ReviewCreate, ReviewUpdate
 from fastapi import HTTPException
 from datetime import datetime
 
-def serialize(doc) -> dict:
+def serialize(doc, company_id=None) -> dict:
     if not doc: return None
     doc["_id"] = str(doc["_id"])
     if "employee_id" in doc and "employee_name" not in doc:
-        emp = employees_col.find_one({"_id": ObjectId(doc["employee_id"])})
+        emp_query = {"_id": ObjectId(doc["employee_id"])}
+        if company_id: emp_query["company_id"] = company_id
+        emp = employees_col.find_one(emp_query)
         doc["employee_name"] = emp["name"] if emp else "Unknown"
         doc["employee_role"] = emp["role"] if emp else "N/A"
     return doc
 
-def get_all_reviews(employee_id: str = ""):
+def get_all_reviews(employee_id: str = "", company_id: str = None):
     query = {}
+    if company_id: query["company_id"] = company_id
     if employee_id: query["employee_id"] = employee_id
     docs = list(reviews_col.find(query).sort("period", -1))
-    return [serialize(d) for d in docs]
+    return [serialize(d, company_id) for d in docs]
 
-def create_review(data: ReviewCreate):
+def create_review(data: ReviewCreate, company_id: str = None):
     payload = data.model_dump()
     payload["createdAt"] = datetime.now().isoformat()
+    if company_id: payload["company_id"] = company_id
     res = reviews_col.insert_one(payload)
-    return serialize(reviews_col.find_one({"_id": res.inserted_id}))
+    return serialize(reviews_col.find_one({"_id": res.inserted_id}), company_id)
 
-def update_review(rid: str, data: ReviewUpdate):
+def update_review(rid: str, data: ReviewUpdate, company_id: str = None):
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
-    reviews_col.update_one({"_id": ObjectId(rid)}, {"$set": update_data})
-    return serialize(reviews_col.find_one({"_id": ObjectId(rid)}))
+    query = {"_id": ObjectId(rid)}
+    if company_id: query["company_id"] = company_id
+    reviews_col.update_one(query, {"$set": update_data})
+    return serialize(reviews_col.find_one(query), company_id)
 
-def get_performance_stats(employee_id: str):
+def get_performance_stats(employee_id: str, company_id: str = None):
     query = {"employee_id": employee_id}
+    if company_id: query["company_id"] = company_id
     docs = list(reviews_col.find(query).sort("period", 1))
     
     ratings_over_time = [{"period": d["period"], "rating": d["rating"]} for d in docs]

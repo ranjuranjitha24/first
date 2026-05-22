@@ -39,3 +39,9 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordConfirm(BaseModel):
     token: str
     new_password: str
+
+# ── Setup initial password (forced change on first login) ──
+class SetupPasswordRequest(BaseModel):
+    username: str
+    temp_password: str
+    new_password: str

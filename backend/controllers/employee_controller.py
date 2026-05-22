@@ -14,8 +14,10 @@ def serialize(doc) -> dict:
     return doc
 
 
-def get_all_employees(search: str = "", role: str = ""):
+def get_all_employees(search: str = "", role: str = "", company_id: str = None):
     query = {}
+    if company_id:
+        query["company_id"] = company_id
     if role:
         query["role"] = role
     if search:
@@ -28,9 +30,12 @@ def get_all_employees(search: str = "", role: str = ""):
     return [serialize(d) for d in docs]
 
 
-def get_employee(emp_id: str) -> dict:
+def get_employee(emp_id: str, company_id: str = None) -> dict:
     try:
-        doc = employees_col.find_one({"_id": ObjectId(emp_id)})
+        query = {"_id": ObjectId(emp_id)}
+        if company_id:
+            query["company_id"] = company_id
+        doc = employees_col.find_one(query)
     except InvalidId:
         raise HTTPException(status_code=400, detail="Invalid employee ID")
     if not doc:
@@ -38,7 +43,7 @@ def get_employee(emp_id: str) -> dict:
     return serialize(doc)
 
 
-def create_employee(data: EmployeeCreate) -> dict:
+def create_employee(data: EmployeeCreate, current_username: str = None, company_id: str = None) -> dict:
     # Check duplicate email
     if employees_col.find_one({"email": data.email}):
         raise HTTPException(status_code=400, detail="Email already exists")
@@ -49,6 +54,8 @@ def create_employee(data: EmployeeCreate) -> dict:
     password = payload.pop("password", None)
     
     payload["createdAt"] = datetime.now(timezone.utc).isoformat()
+    if company_id:
+        payload["company_id"] = company_id
     result = employees_col.insert_one(payload)
     emp_id = str(result.inserted_id)
     
@@ -64,13 +71,21 @@ def create_employee(data: EmployeeCreate) -> dict:
             "username": auth_username,
             "password": auth_password,
             "role": "employee",
-            "employee_id": emp_id
+            "employee_id": emp_id,
+            "company_id": company_id
         })
+
+    # Increment demo limit if applicable
+    if current_username:
+        users_col.update_one(
+            {"username": current_username, "isDemoUser": True},
+            {"$inc": {"currentUsage.employees": 1}}
+        )
 
     return serialize(employees_col.find_one({"_id": result.inserted_id}))
 
 
-def update_employee(emp_id: str, data: EmployeeUpdate) -> dict:
+def update_employee(emp_id: str, data: EmployeeUpdate, company_id: str = None) -> dict:
     try:
         oid = ObjectId(emp_id)
     except InvalidId:
@@ -79,11 +94,15 @@ def update_employee(emp_id: str, data: EmployeeUpdate) -> dict:
     if not update_data:
         raise HTTPException(status_code=400, detail="No fields to update")
     
-    old_doc = employees_col.find_one({"_id": oid})
+    query = {"_id": oid}
+    if company_id:
+        query["company_id"] = company_id
+
+    old_doc = employees_col.find_one(query)
     if not old_doc:
         raise HTTPException(status_code=404, detail="Employee not found")
 
-    employees_col.update_one({"_id": oid}, {"$set": update_data})
+    employees_col.update_one(query, {"$set": update_data})
     
     # Update username if email changed
     if "email" in update_data and update_data["email"] != old_doc["email"]:
@@ -93,12 +112,17 @@ def update_employee(emp_id: str, data: EmployeeUpdate) -> dict:
     return serialize(employees_col.find_one({"_id": oid}))
 
 
-def delete_employee(emp_id: str) -> dict:
+def delete_employee(emp_id: str, company_id: str = None) -> dict:
     try:
         oid = ObjectId(emp_id)
     except InvalidId:
         raise HTTPException(status_code=400, detail="Invalid employee ID")
-    doc = employees_col.find_one({"_id": oid})
+        
+    query = {"_id": oid}
+    if company_id:
+        query["company_id"] = company_id
+        
+    doc = employees_col.find_one(query)
     if not doc:
         raise HTTPException(status_code=404, detail="Employee not found")
     
@@ -106,16 +130,21 @@ def delete_employee(emp_id: str) -> dict:
     from config.db import users_col
     users_col.delete_one({"username": doc["email"]})
 
-    employees_col.delete_one({"_id": oid})
+    employees_col.delete_one(query)
     # Also delete related interviews
-    interviews_col.delete_many({"employee": emp_id})
+    int_query = {"employee": emp_id}
+    if company_id:
+        int_query["company_id"] = company_id
+    interviews_col.delete_many(int_query)
     return {"message": "Employee and their user account deleted"}
 
 
-def get_stats(employee_id: str = "") -> dict:
+def get_stats(employee_id: str = "", company_id: str = None) -> dict:
     query = {}
+    if company_id:
+        query["company_id"] = company_id
     if employee_id:
-        query = {"employee": employee_id}
+        query["employee"] = employee_id
         
     total_interviews = interviews_col.count_documents(query)
     scheduled        = interviews_col.count_documents({**query, "status": "Scheduled"})
@@ -132,7 +161,10 @@ def get_stats(employee_id: str = "") -> dict:
             "totalEmployees": 1 # Just for dashboard fallback
         }
 
-    total_employees  = employees_col.count_documents({})
+    emp_query = {}
+    if company_id:
+        emp_query["company_id"] = company_id
+    total_employees  = employees_col.count_documents(emp_query)
     return {
         "totalEmployees":  total_employees,
         "totalInterviews": total_interviews,

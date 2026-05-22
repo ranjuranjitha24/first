@@ -17,16 +17,16 @@ def list_payroll(
     else:
         emp_id = employee_id
     
-    return {"success": True, "data": ctrl.get_all_payroll(month, emp_id)}
+    return {"success": True, "data": ctrl.get_all_payroll(month, emp_id, company_id=user.get("company_id"))}
 
 @router.get("/stats")
 def get_stats(user: dict = Depends(check_admin)):
-    return {"success": True, "data": ctrl.get_payroll_stats()}
+    return {"success": True, "data": ctrl.get_payroll_stats(company_id=user.get("company_id"))}
 
 @router.post("/")
 def add_payroll(data: PayrollCreate, user: dict = Depends(check_admin)):
-    return {"success": True, "data": ctrl.create_payroll(data)}
+    return {"success": True, "data": ctrl.create_payroll(data, company_id=user.get("company_id"))}
 
 @router.put("/{pid}")
 def update_payroll(pid: str, data: PayrollUpdate, user: dict = Depends(check_admin)):
-    return {"success": True, "data": ctrl.update_payroll(pid, data)}
+    return {"success": True, "data": ctrl.update_payroll(pid, data, company_id=user.get("company_id"))}

@@ -4,6 +4,13 @@ import { getEmployees } from '../services/api'
 import EmployeeList from '../components/EmployeeList'
 import EmployeeForm from '../components/EmployeeForm'
 import InterviewForm from '../components/InterviewForm'
+import { toast } from 'sonner'
+import { PageWrapper } from '../components/ui/PageWrapper'
+import { Card } from '../components/ui/Card'
+import { SkeletonLoader } from '../components/ui/SkeletonLoader'
+import { Modal } from '../components/ui/Modal'
+import { Button } from '../components/ui/Button'
+import { Plus } from 'lucide-react'
 
 const ROLES = ['Frontend Developer','Backend Developer','UI/UX Designer','Product Manager','Data Analyst','DevOps Engineer','QA Engineer','HR Manager']
 
@@ -21,9 +28,6 @@ export default function Employees() {
   const [editEmp, setEditEmp] = useState(null)
   const [scheduleEmp, setScheduleEmp] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [toast, setToast] = useState('')
-
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
   const fetchEmployees = useCallback(async () => {
     setLoading(true)
@@ -41,14 +45,12 @@ export default function Employees() {
 
   const handleSaved = () => {
     setShowModal(false); setEditEmp(null)
-    showToast(editEmp ? '✅ Employee details updated!' : '✅ New employee onboarded!')
+    toast.success(editEmp ? 'Employee details updated!' : 'New employee onboarded!')
     fetchEmployees()
   }
 
   return (
-    <div className="page-content page-fade-in">
-      {toast && <div className="toast show success" style={{position:'fixed', top:24, right:24, zIndex:10001}}>{toast}</div>}
-
+    <PageWrapper>
       <div className="page-header">
         <div>
           <h1 className="page-title">Employees</h1>
@@ -59,11 +61,11 @@ export default function Employees() {
             <button className={viewMode === 'table' ? 'active' : ''} onClick={() => setViewMode('table')}>Table</button>
             <button className={viewMode === 'cards' ? 'active' : ''} onClick={() => setViewMode('cards')}>Cards</button>
           </div>
-          <button className="btn-primary" onClick={handleAdd}>➕ Add Employee</button>
+          <Button onClick={handleAdd} icon={Plus}>Add Employee</Button>
         </div>
       </div>
 
-      <div className="card">
+      <Card>
         <div className="card-header">
           <h3>Team Directory ({filtered.length})</h3>
           <div className="filters">
@@ -82,10 +84,11 @@ export default function Employees() {
         </div>
 
         {loading ? (
-          <div className="loading-state" style={{ padding: 60 }}>
-            <div className="skeleton-text skeleton" style={{ width: '100%', height: 40, marginBottom: 12 }}></div>
-            <div className="skeleton-text skeleton" style={{ width: '100%', height: 40, marginBottom: 12 }}></div>
-            <div className="skeleton-text skeleton" style={{ width: '100%', height: 40 }}></div>
+          <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <SkeletonLoader style={{ height: 40 }} />
+            <SkeletonLoader style={{ height: 40 }} />
+            <SkeletonLoader style={{ height: 40 }} />
+            <SkeletonLoader style={{ height: 40 }} />
           </div>
         ) : (
           <EmployeeList 
@@ -96,35 +99,38 @@ export default function Employees() {
             viewMode={viewMode}
           />
         )}
-      </div>
+      </Card>
 
       {/* ── ADD/EDIT MODAL ── */}
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>{editEmp ? '✏️ Edit Employee' : '➕ Onboard Employee'}</h3>
-              <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
-            </div>
-            <div className="modal-body">
-              <EmployeeForm 
-                employee={editEmp} 
-                onSave={handleSaved} 
-                onCancel={() => setShowModal(false)} 
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal 
+        isOpen={showModal} 
+        onClose={() => setShowModal(false)}
+        title={editEmp ? 'Edit Employee' : 'Onboard Employee'}
+        subtitle={editEmp ? 'Update team member information' : 'Add a new member to your team'}
+        maxWidth={600}
+      >
+        <EmployeeForm 
+          employee={editEmp} 
+          onSave={handleSaved} 
+          onCancel={() => setShowModal(false)} 
+        />
+      </Modal>
 
       {scheduleEmp && (
-        <InterviewForm
-          employees={employees}
-          preselectedEmployee={scheduleEmp}
-          onSave={() => { setScheduleEmp(null); showToast('📅 Interview scheduled!') }}
+        <Modal 
+          isOpen={true} 
           onClose={() => setScheduleEmp(null)}
-        />
+          title="Schedule Interview"
+          maxWidth={600}
+        >
+          <InterviewForm
+            employees={employees}
+            preselectedEmployee={scheduleEmp}
+            onSave={() => { setScheduleEmp(null); toast.success('Interview scheduled!') }}
+            onClose={() => setScheduleEmp(null)}
+          />
+        </Modal>
       )}
-    </div>
+    </PageWrapper>
   )
 }

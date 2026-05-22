@@ -41,6 +41,21 @@ API.interceptors.response.use(
         window.location.href = '/login?reason=expired'
       }
     }
+    
+    // Catch Trial / Limits logic for SaaS Upgrade flow
+    if (status === 403 && err.response?.data?.detail) {
+      const detail = err.response.data.detail;
+      if (detail === 'demo_limit_reached' || detail === 'demo_expired') {
+        const event = new CustomEvent('showUpgradeModal', {
+          detail: { 
+            reason: detail, 
+            message: err.response.data.message || 'Upgrade required.'
+          }
+        });
+        window.dispatchEvent(event);
+      }
+    }
+    
     // 403 = forbidden role — just let the component handle it silently
     return Promise.reject(err)
   }
@@ -56,6 +71,7 @@ export const candidateRegister   = (data) => API.post('/auth/candidate/register'
 export const candidateLogin      = (data) => API.post('/auth/candidate/login', data)
 export const forgotPassword      = (data) => API.post('/auth/forgot-password', data)
 export const resetPassword       = (data) => API.post('/auth/reset-password', data)
+export const setupPassword       = (data) => API.post('/auth/setup-password', data)
 
 // ── EMPLOYEES ──
 export const getEmployees    = (params)     => API.get('/employees/', { params })
@@ -139,3 +155,11 @@ export const getUpcomingMeetings = ()          => API.get('/meetings/upcoming')
 export const addMeeting          = (data)      => API.post('/meetings/', data)
 export const updateMeeting       = (id, data)  => API.put(`/meetings/${id}`, data)
 export const deleteMeeting       = (id)        => API.delete(`/meetings/${id}`)
+
+// ── DEMO REQUESTS ──
+export const submitDemoRequest     = (data)      => API.post('/demo-requests/', data)
+export const getDemoRequests       = (params)    => API.get('/demo-requests/', { params })
+export const getDemoRequestStats   = ()          => API.get('/demo-requests/stats')
+export const getDemoRequestById    = (id)        => API.get(`/demo-requests/${id}`)
+export const updateDemoRequest     = (id, data)  => API.put(`/demo-requests/${id}`, data)
+export const deleteDemoRequest     = (id)        => API.delete(`/demo-requests/${id}`)

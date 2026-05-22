@@ -10,25 +10,32 @@ def serialize(doc) -> dict:
     doc["_id"] = str(doc["_id"])
     return doc
 
-def get_all_jobs(status: str = "") -> list:
-    query = {"status": status} if status else {}
+def get_all_jobs(status: str = "", company_id: str = None) -> list:
+    query = {}
+    if status: query["status"] = status
+    if company_id: query["company_id"] = company_id
     return [serialize(d) for d in jobs_col.find(query).sort("createdAt", -1)]
 
-def create_job(data: JobCreate) -> dict:
+def create_job(data: JobCreate, company_id: str = None) -> dict:
     payload = data.model_dump()
     payload["createdAt"] = datetime.now(timezone.utc).isoformat()
+    if company_id: payload["company_id"] = company_id
     result = jobs_col.insert_one(payload)
     return serialize(jobs_col.find_one({"_id": result.inserted_id}))
 
-def update_job(job_id: str, data: JobUpdate) -> dict:
+def update_job(job_id: str, data: JobUpdate, company_id: str = None) -> dict:
     try: oid = ObjectId(job_id)
     except InvalidId: raise HTTPException(400, "Invalid job ID")
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
-    jobs_col.update_one({"_id": oid}, {"$set": update_data})
-    return serialize(jobs_col.find_one({"_id": oid}))
+    query = {"_id": oid}
+    if company_id: query["company_id"] = company_id
+    jobs_col.update_one(query, {"$set": update_data})
+    return serialize(jobs_col.find_one(query))
 
-def delete_job(job_id: str) -> dict:
+def delete_job(job_id: str, company_id: str = None) -> dict:
     try: oid = ObjectId(job_id)
     except InvalidId: raise HTTPException(400, "Invalid job ID")
-    jobs_col.delete_one({"_id": oid})
+    query = {"_id": oid}
+    if company_id: query["company_id"] = company_id
+    jobs_col.delete_one(query)
     return {"message": "Job deleted"}

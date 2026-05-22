@@ -3,20 +3,32 @@ import time
 import base64
 import json
 import secrets
+import re
 from datetime import datetime
 from config.db import users_col, notifications_col
-from models.user_model import UserCreate, UserLogin, CandidateRegister, CandidateLogin
+from models.user_model import UserCreate, UserLogin, CandidateRegister, CandidateLogin, SetupPasswordRequest
 from fastapi import HTTPException
-
+import bcrypt
 
 # ── Helpers ──────────────────────────────────────────────────
 
 def hash_pw(pw: str) -> str:
+    # Legacy SHA-256 for older passwords (DO NOT USE for new setups)
     return hashlib.sha256(pw.encode()).hexdigest()
+
+def verify_password(plain_pw: str, stored_pw: str) -> bool:
+    """Supports both legacy SHA-256 and new Bcrypt."""
+    if stored_pw.startswith("$2b$"):
+        return bcrypt.checkpw(plain_pw.encode(), stored_pw.encode())
+    return stored_pw == hash_pw(plain_pw)
+
+def hash_pw_secure(pw: str) -> str:
+    """New secure bcrypt hashing."""
+    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
 
 
 def make_token(identifier: str, role: str, employee_id: str = None,
-               full_name: str = None, email: str = None) -> str:
+               full_name: str = None, email: str = None, company_id: str = None, **kwargs) -> str:
     payload = {
         "username": identifier,   # kept as 'username' key for backward-compat
         "role": role,
@@ -28,6 +40,13 @@ def make_token(identifier: str, role: str, employee_id: str = None,
         payload["full_name"] = full_name
     if email:
         payload["email"] = email
+    if company_id:
+        payload["company_id"] = company_id
+        
+    for k, v in kwargs.items():
+        if v is not None:
+            payload[k] = v
+            
     return base64.b64encode(json.dumps(payload).encode()).decode()
 
 
@@ -45,13 +64,14 @@ def verify_token(token: str) -> dict:
 
 # ── Admin / HR authentication (username-based) ───────────────
 
-def register_user(data: UserCreate) -> dict:
+def register_user(data: UserCreate, company_id: str = "master_company") -> dict:
     if users_col.find_one({"username": data.username}):
         raise HTTPException(status_code=400, detail="Username already exists")
     doc = {
         "username": data.username,
-        "password": hash_pw(data.password),
+        "password": hash_pw_secure(data.password), # Use bcrypt for new regs
         "role": data.role,
+        "company_id": company_id,
         "createdAt": datetime.now().isoformat()
     }
     users_col.insert_one(doc)
@@ -68,15 +88,76 @@ def login_user(data: UserLogin) -> dict:
 
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
-    if user["password"] != hash_pw(data.password):
+    if not verify_password(data.password, user["password"]):
         raise HTTPException(status_code=401, detail="Wrong password")
+
+    # Temp Password Expiry Check
+    if user.get("forcePasswordChange") and user.get("tempPasswordExpiresAt"):
+        try:
+            temp_end = datetime.fromisoformat(user["tempPasswordExpiresAt"])
+            if datetime.now() > temp_end:
+                raise HTTPException(status_code=403, detail="temp_password_expired")
+        except ValueError:
+            pass
+
+    # Trial Expiration Check
+    if user.get("isDemoUser") and user.get("trialEndDate"):
+        try:
+            end_date = datetime.fromisoformat(user["trialEndDate"])
+            if datetime.now() > end_date:
+                raise HTTPException(status_code=403, detail="demo_expired")
+        except ValueError:
+            pass # In case format is broken
 
     role = user.get("role", "employee")
     employee_id = str(user.get("employee_id") or user.get("_id"))
     full_name = user.get("full_name", user.get("username"))
     email = user.get("email", "")
-    token = make_token(data.username, role, employee_id, full_name, email)
-    return {"token": token, "username": data.username, "role": role}
+    
+    # Extract demo info if available
+    is_demo_user = user.get("isDemoUser")
+    plan_type = user.get("planType")
+    trial_end_date = user.get("trialEndDate")
+    force_password_change = user.get("forcePasswordChange", False)
+    company_id = user.get("company_id", "master_company")
+    
+    token = make_token(data.username, role, employee_id, full_name, email, company_id=company_id,
+                       isDemoUser=is_demo_user, planType=plan_type, trialEndDate=trial_end_date)
+    return {
+        "token": token, 
+        "username": data.username, 
+        "role": role,
+        "isDemoUser": is_demo_user,
+        "planType": plan_type,
+        "trialEndDate": trial_end_date,
+        "forcePasswordChange": force_password_change,
+        "company_id": company_id
+    }
+
+def setup_password(data: SetupPasswordRequest) -> dict:
+    user = users_col.find_one({"username": data.username})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if not verify_password(data.temp_password, user["password"]):
+        raise HTTPException(status_code=401, detail="Invalid temporary password")
+        
+    # Validate password complexity
+    pw = data.new_password
+    if len(pw) < 8 or not re.search(r"[A-Z]", pw) or not re.search(r"[a-z]", pw) or not re.search(r"[0-9]", pw) or not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]", pw):
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long and contain uppercase, lowercase, number, and special character.")
+        
+    users_col.update_one(
+        {"_id": user["_id"]},
+        {
+            "$set": {
+                "password": hash_pw_secure(data.new_password),
+                "forcePasswordChange": False
+            },
+            "$unset": {"tempPasswordExpiresAt": ""}
+        }
+    )
+    return {"success": True, "message": "Password successfully updated."}
 
 
 # ── Candidate self-registration (email-based) ────────────────
@@ -92,7 +173,7 @@ def register_candidate(data: CandidateRegister) -> dict:
         "full_name": data.full_name,
         "phone": data.phone,
         "resume": data.resume,
-        "password": hash_pw(data.password),
+        "password": hash_pw_secure(data.password), # Bcrypt
         "role": "candidate",
         "skills": [],
         "experience": [],
@@ -126,20 +207,23 @@ def login_candidate(data: CandidateLogin) -> dict:
             user = None   # not a match for this email
 
     if not user:
-        raise HTTPException(status_code=401, detail="No account found with this email")
-    if user["password"] != hash_pw(data.password):
-        raise HTTPException(status_code=401, detail="Incorrect password")
+        raise HTTPException(status_code=401, detail="Candidate account not found")
+
+    if not verify_password(data.password, user["password"]):
+        raise HTTPException(status_code=401, detail="Wrong password")
 
     email = user.get("email", user.get("username"))
     full_name = user.get("full_name", email)
     employee_id = str(user.get("_id"))
-    token = make_token(email, "candidate", employee_id, full_name, email)
+    company_id = user.get("company_id", "master_company")
+    token = make_token(email, "candidate", employee_id, full_name, email, company_id=company_id)
     return {
         "token": token,
         "username": email,
         "email": email,
         "full_name": full_name,
-        "role": "candidate"
+        "role": "candidate",
+        "company_id": company_id
     }
 
 
@@ -176,17 +260,20 @@ def reset_password(token: str, new_password: str) -> dict:
         raise HTTPException(status_code=400, detail="Reset token has expired")
 
     users_col.update_one(
-        {"reset_token": token},
-        {"$set": {"password": hash_pw(new_password)},
-         "$unset": {"reset_token": "", "reset_token_exp": ""}}
+        {"username": user["username"]},
+        {
+            "$set": {"password": hash_pw_secure(new_password)},
+            "$unset": {"reset_token": "", "reset_token_exp": ""}
+        }
     )
-    return {"message": "Password updated successfully"}
+    return {"message": "Password successfully reset. You can now login."}
 
 
 # ── Seed default users ────────────────────────────────────────
 
 def seed_admin():
     from config.db import employees_col, jobs_col, candidates_col
+    company_id = "master_company"
 
     # Admin
     if employees_col.count_documents({"email": "admin@hrpro.com"}) == 0:
@@ -195,6 +282,7 @@ def seed_admin():
             "email": "admin@hrpro.com",
             "role": "admin",
             "department": "Management",
+            "company_id": company_id,
             "createdAt": datetime.now().isoformat()
         })
         users_col.insert_one({
@@ -202,6 +290,7 @@ def seed_admin():
             "password": hash_pw("admin123"),
             "role": "admin",
             "employee_id": str(admin_res.inserted_id),
+            "company_id": company_id,
             "createdAt": datetime.now().isoformat()
         })
         print("✅ Admin created: admin / admin123")
@@ -213,6 +302,7 @@ def seed_admin():
             "email": "user@hrpro.com",
             "role": "employee",
             "department": "Engineering",
+            "company_id": company_id,
             "createdAt": datetime.now().isoformat()
         })
         users_col.insert_one({
@@ -220,6 +310,7 @@ def seed_admin():
             "password": hash_pw("user123"),
             "role": "employee",
             "employee_id": str(user_res.inserted_id),
+            "company_id": company_id,
             "createdAt": datetime.now().isoformat()
         })
         print("✅ Employee created: user / user123")
@@ -237,6 +328,7 @@ def seed_admin():
             "education": ["B.Tech Computer Science, 2022"],
             "bio": "Passionate developer looking for opportunities.",
             "location": "Bangalore",
+            "company_id": company_id,
             "createdAt": datetime.now().isoformat()
         })
         print("✅ Demo candidate: candidate@demo.com / candidate123")
@@ -247,15 +339,15 @@ def seed_admin():
             {"title": "Frontend Developer", "department": "Engineering",
              "location": "Bangalore", "type": "Full-time", "status": "Open",
              "salary": "₹8-12 LPA", "required_skills": "React, CSS, JavaScript",
-             "createdAt": datetime.now().isoformat()},
+             "company_id": company_id, "createdAt": datetime.now().isoformat()},
             {"title": "Backend Developer", "department": "Engineering",
              "location": "Remote", "type": "Full-time", "status": "Open",
              "salary": "₹10-15 LPA", "required_skills": "Python, FastAPI, MongoDB",
-             "createdAt": datetime.now().isoformat()},
+             "company_id": company_id, "createdAt": datetime.now().isoformat()},
             {"title": "UI/UX Designer", "department": "Design",
              "location": "Bangalore", "type": "Contract", "status": "Open",
              "salary": "₹6-10 LPA", "required_skills": "Figma, Adobe XD",
-             "createdAt": datetime.now().isoformat()}
+             "company_id": company_id, "createdAt": datetime.now().isoformat()}
         ]
         jobs_col.insert_many(jobs)
         print("✅ Sample jobs seeded")
@@ -267,10 +359,10 @@ def seed_admin():
         ui = jobs_col.find_one({"title": "UI/UX Designer"}) or {"_id": "ui"}
         candidates_col.insert_many([
             {"name": "Aditya Verma", "email": "aditya@example.com",
-             "job_id": str(fe["_id"]), "stage": "Applied", "createdAt": datetime.now().isoformat()},
+             "job_id": str(fe["_id"]), "stage": "Applied", "company_id": company_id, "createdAt": datetime.now().isoformat()},
             {"name": "Sneha Rao",    "email": "sneha@example.com",
-             "job_id": str(be["_id"]), "stage": "Shortlisted", "createdAt": datetime.now().isoformat()},
+             "job_id": str(be["_id"]), "stage": "Shortlisted", "company_id": company_id, "createdAt": datetime.now().isoformat()},
             {"name": "John Doe",     "email": "john@example.com",
-             "job_id": str(ui["_id"]), "stage": "Interview",   "createdAt": datetime.now().isoformat()},
+             "job_id": str(ui["_id"]), "stage": "Interview", "company_id": company_id, "createdAt": datetime.now().isoformat()},
         ])
         print("✅ Sample pipeline candidates seeded")

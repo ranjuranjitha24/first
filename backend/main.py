@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from routes import employee_routes, interview_routes, auth_routes
-from routes import job_routes, candidate_routes, leave_routes, review_routes, attendance_routes, payroll_routes, ai_routes, notification_routes, candidate_portal_routes, meeting_routes
+from routes import job_routes, candidate_routes, leave_routes, review_routes, attendance_routes, payroll_routes, ai_routes, notification_routes, candidate_portal_routes, meeting_routes, demo_request_routes
 from controllers.auth_controller import seed_admin
 
 load_dotenv()
@@ -47,6 +47,7 @@ app.include_router(ai_routes.router,         prefix="/api/ai",         tags=["AI
 app.include_router(notification_routes.router, prefix="/api/notifications", tags=["Notifications"])
 app.include_router(meeting_routes.router,      prefix="/api/meetings",      tags=["Meetings"])
 app.include_router(candidate_portal_routes.router, prefix="/api/portal", tags=["Candidate Portal"])
+app.include_router(demo_request_routes.router, prefix="/api/demo-requests", tags=["Demo Requests"])
 
 @app.get("/api/health")
 def health():

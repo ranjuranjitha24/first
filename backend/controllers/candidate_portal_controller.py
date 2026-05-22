@@ -19,11 +19,16 @@ def _resolve_email(user_token: dict) -> str:
     return user_token.get("email") or user_token.get("username", "")
 
 
-def _get_user_doc(email: str):
+def _get_user_doc(email: str, company_id: str = None):
     """Find user in users_col by email OR legacy username."""
-    user = users_col.find_one({"email": email, "role": "candidate"})
+    query1 = {"email": email, "role": "candidate"}
+    query2 = {"username": email, "role": "candidate"}
+    if company_id:
+        query1["company_id"] = company_id
+        query2["company_id"] = company_id
+    user = users_col.find_one(query1)
     if not user:
-        user = users_col.find_one({"username": email, "role": "candidate"})
+        user = users_col.find_one(query2)
     return user
 
 
@@ -31,17 +36,23 @@ def _get_user_doc(email: str):
 
 def get_candidate_stats(user_token: dict) -> dict:
     email = _resolve_email(user_token)
-    apps = list(candidates_col.find({"email": email}))
+    company_id = user_token.get("company_id")
+    query = {"email": email}
+    if company_id: query["company_id"] = company_id
+    
+    apps = list(candidates_col.find(query))
     total_apps = len(apps)
     shortlisted = len([a for a in apps if a.get("stage") == "Shortlisted"])
 
-    cand = candidates_col.find_one({"email": email})
+    cand = candidates_col.find_one(query)
     upcoming_interviews = 0
     if cand:
-        upcoming_interviews = interviews_col.count_documents({
+        int_query = {
             "candidate_id": str(cand["_id"]),
             "date": {"$gte": datetime.now().strftime("%Y-%m-%d")}
-        })
+        }
+        if company_id: int_query["company_id"] = company_id
+        upcoming_interviews = interviews_col.count_documents(int_query)
 
     return {
         "totalApplications": total_apps,
@@ -54,7 +65,8 @@ def get_candidate_stats(user_token: dict) -> dict:
 
 def get_candidate_profile(user_token: dict) -> dict:
     email = _resolve_email(user_token)
-    user = _get_user_doc(email)
+    company_id = user_token.get("company_id")
+    user = _get_user_doc(email, company_id)
     if not user:
         raise HTTPException(404, "User not found")
 
@@ -75,13 +87,20 @@ def get_candidate_profile(user_token: dict) -> dict:
 
 def update_candidate_profile(user_token: dict, data: dict) -> dict:
     email = _resolve_email(user_token)
+    company_id = user_token.get("company_id")
     allowed = ["skills", "experience", "education", "resume", "bio", "location", "phone", "full_name"]
     update_data = {k: v for k, v in data.items() if k in allowed}
 
+    query1 = {"email": email, "role": "candidate"}
+    query2 = {"username": email, "role": "candidate"}
+    if company_id:
+        query1["company_id"] = company_id
+        query2["company_id"] = company_id
+
     # Update by email first; fall back to username key
-    res = users_col.update_one({"email": email, "role": "candidate"}, {"$set": update_data})
+    res = users_col.update_one(query1, {"$set": update_data})
     if res.matched_count == 0:
-        users_col.update_one({"username": email, "role": "candidate"}, {"$set": update_data})
+        users_col.update_one(query2, {"$set": update_data})
 
     return {"message": "Profile updated successfully"}
 
@@ -90,8 +109,11 @@ def update_candidate_profile(user_token: dict, data: dict) -> dict:
 
 def get_notifications(user_token: dict) -> list:
     email = _resolve_email(user_token)
+    company_id = user_token.get("company_id")
+    query = {"recipient": email}
+    if company_id: query["company_id"] = company_id
     notifs = list(
-        notifications_col.find({"recipient": email})
+        notifications_col.find(query)
         .sort("createdAt", -1)
         .limit(30)
     )
@@ -100,11 +122,11 @@ def get_notifications(user_token: dict) -> list:
 
 def mark_notification_read(notif_id: str, user_token: dict) -> dict:
     email = _resolve_email(user_token)
+    company_id = user_token.get("company_id")
     try:
-        notifications_col.update_one(
-            {"_id": ObjectId(notif_id), "recipient": email},
-            {"$set": {"read": True}}
-        )
+        query = {"_id": ObjectId(notif_id), "recipient": email}
+        if company_id: query["company_id"] = company_id
+        notifications_col.update_one(query, {"$set": {"read": True}})
     except Exception:
         pass
     return {"message": "Marked as read"}
@@ -114,24 +136,29 @@ def mark_notification_read(notif_id: str, user_token: dict) -> dict:
 
 def apply_to_job(user_token: dict, data: dict) -> dict:
     email = _resolve_email(user_token)
+    company_id = user_token.get("company_id")
     job_id = data.get("job_id")
     if not job_id:
         raise HTTPException(400, "Job ID is required")
 
     # Duplicate check
-    existing = candidates_col.find_one({"email": email, "job_id": job_id})
+    cand_query = {"email": email, "job_id": job_id}
+    if company_id: cand_query["company_id"] = company_id
+    existing = candidates_col.find_one(cand_query)
     if existing:
         raise HTTPException(400, "You have already applied for this position")
 
     try:
-        job = jobs_col.find_one({"_id": ObjectId(job_id)})
+        job_query = {"_id": ObjectId(job_id)}
+        if company_id: job_query["company_id"] = company_id
+        job = jobs_col.find_one(job_query)
     except Exception:
         raise HTTPException(400, "Invalid job ID")
     if not job:
         raise HTTPException(404, "Job not found")
 
     # Pull full_name from users_col for a friendlier display
-    user_doc = _get_user_doc(email)
+    user_doc = _get_user_doc(email, company_id)
     display_name = (user_doc or {}).get("full_name", email) if user_doc else email
 
     application = {
@@ -144,15 +171,18 @@ def apply_to_job(user_token: dict, data: dict) -> dict:
         "resume": data.get("resume", (user_doc or {}).get("resume", "")),
         "createdAt": datetime.now().isoformat()
     }
+    if company_id: application["company_id"] = company_id
     candidates_col.insert_one(application)
 
-    notifications_col.insert_one({
+    notif = {
         "recipient": email,
         "title": "Application Submitted ✅",
         "message": f"You successfully applied for {job['title']}. We'll keep you updated!",
         "type": "success",
         "read": False,
         "createdAt": datetime.now().isoformat()
-    })
+    }
+    if company_id: notif["company_id"] = company_id
+    notifications_col.insert_one(notif)
 
     return {"message": "Application submitted successfully", "job_title": job["title"]}

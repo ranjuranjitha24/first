@@ -2,10 +2,13 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from
 import { useEffect }       from 'react'
 import { SessionProvider, useSession } from './context/SessionContext'
 import { getToken }        from './services/session'
+import { Toaster }         from 'sonner'
+import { AnimatePresence } from 'framer-motion'
 
 import Sidebar          from './components/Sidebar'
 import TopNav           from './components/TopNav'
 import AIAssistant      from './components/AIAssistant'
+import UpgradeModal     from './components/UpgradeModal'
 
 import Dashboard        from './pages/Dashboard'
 import Employees        from './pages/Employees'
@@ -25,6 +28,8 @@ import Careers          from './pages/Careers'
 import Login            from './pages/Login'
 import Register         from './pages/Register'
 import ForgotPassword   from './pages/ForgotPassword'
+import LandingPage      from './pages/LandingPage'
+import DemoRequests     from './pages/DemoRequests'
 
 // ── Route Guards ──────────────────────────────────────────────────────────
 
@@ -81,44 +86,51 @@ function LoginPage() {
 
 // ── Shell (authenticated layout) ─────────────────────────────────────────
 function AppShell() {
+  const location = useLocation()
+  
   return (
     <div className="app-layout">
       <Sidebar />
       <main className="main-content">
         <TopNav />
         <AIAssistant />
-        <Routes>
-          {/* Default redirect */}
-          <Route path="/" element={<RoleRoute roles={['admin','hr']}><Navigate to="/admin/dashboard" replace /></RoleRoute>} />
+        <UpgradeModal />
+        
+        <AnimatePresence mode="wait">
+          <Routes location={location} key={location.pathname}>
+            {/* Default redirect */}
+            <Route path="/" element={<RoleRoute roles={['admin','hr']}><Navigate to="/admin/dashboard" replace /></RoleRoute>} />
 
-          {/* Admin / HR */}
-          <Route path="/admin/dashboard" element={<RoleRoute roles={['admin','hr']}><Dashboard /></RoleRoute>} />
-          <Route path="/analytics"       element={<RoleRoute roles={['admin','hr']}><Analytics /></RoleRoute>} />
-          <Route path="/employees"       element={<RoleRoute roles={['admin','hr']}><Employees /></RoleRoute>} />
-          <Route path="/jobs"            element={<RoleRoute roles={['admin','hr']}><Jobs /></RoleRoute>} />
-          <Route path="/candidates"      element={<RoleRoute roles={['admin','hr']}><Candidates /></RoleRoute>} />
-          <Route path="/settings"        element={<RoleRoute roles={['admin','hr']}><Profile /></RoleRoute>} />
+            {/* Admin / HR */}
+            <Route path="/admin/dashboard" element={<RoleRoute roles={['admin','hr']}><Dashboard /></RoleRoute>} />
+            <Route path="/analytics"       element={<RoleRoute roles={['admin','hr']}><Analytics /></RoleRoute>} />
+            <Route path="/employees"       element={<RoleRoute roles={['admin','hr']}><Employees /></RoleRoute>} />
+            <Route path="/jobs"            element={<RoleRoute roles={['admin','hr']}><Jobs /></RoleRoute>} />
+            <Route path="/candidates"      element={<RoleRoute roles={['admin','hr']}><Candidates /></RoleRoute>} />
+            <Route path="/settings"        element={<RoleRoute roles={['admin','hr']}><Profile /></RoleRoute>} />
+            <Route path="/admin/demo-requests" element={<RoleRoute roles={['admin','hr']}><DemoRequests /></RoleRoute>} />
 
-          {/* Employee */}
-          <Route path="/employee/dashboard" element={<RoleRoute roles={['employee']}><Dashboard /></RoleRoute>} />
-          <Route path="/attendance"         element={<RoleRoute roles={['admin','hr','employee']}><Attendance /></RoleRoute>} />
-          <Route path="/payroll"            element={<RoleRoute roles={['admin','hr','employee']}><Payroll /></RoleRoute>} />
+            {/* Employee */}
+            <Route path="/employee/dashboard" element={<RoleRoute roles={['employee']}><Dashboard /></RoleRoute>} />
+            <Route path="/attendance"         element={<RoleRoute roles={['admin','hr','employee']}><Attendance /></RoleRoute>} />
+            <Route path="/payroll"            element={<RoleRoute roles={['admin','hr','employee']}><Payroll /></RoleRoute>} />
 
-          {/* Candidate */}
-          <Route path="/candidate/dashboard" element={<RoleRoute roles={['candidate']}><CandidateDashboard /></RoleRoute>} />
-          <Route path="/jobs/available"      element={<RoleRoute roles={['candidate']}><Careers /></RoleRoute>} />
-          <Route path="/applications"        element={<RoleRoute roles={['candidate']}><CandidateDashboard /></RoleRoute>} />
+            {/* Candidate */}
+            <Route path="/candidate/dashboard" element={<RoleRoute roles={['candidate']}><CandidateDashboard /></RoleRoute>} />
+            <Route path="/jobs/available"      element={<RoleRoute roles={['candidate']}><Careers /></RoleRoute>} />
+            <Route path="/applications"        element={<RoleRoute roles={['candidate']}><CandidateDashboard /></RoleRoute>} />
 
-          {/* Shared */}
-          <Route path="/interviews"   element={<RoleRoute roles={['admin','hr','employee','candidate']}><Interviews /></RoleRoute>} />
-          <Route path="/leaves"       element={<RoleRoute roles={['admin','hr','employee']}><Leaves /></RoleRoute>} />
-          <Route path="/meetings"     element={<RoleRoute roles={['admin','hr','employee']}><Meetings /></RoleRoute>} />
-          <Route path="/reviews"      element={<RoleRoute roles={['admin','hr','employee']}><Reviews /></RoleRoute>} />
-          <Route path="/profile"      element={<RoleRoute roles={['admin','hr','employee','candidate']}><Profile /></RoleRoute>} />
-          <Route path="/notifications" element={<RoleRoute roles={['admin','hr','employee','candidate']}><Notifications /></RoleRoute>} />
+            {/* Shared */}
+            <Route path="/interviews"   element={<RoleRoute roles={['admin','hr','employee','candidate']}><Interviews /></RoleRoute>} />
+            <Route path="/leaves"       element={<RoleRoute roles={['admin','hr','employee']}><Leaves /></RoleRoute>} />
+            <Route path="/meetings"     element={<RoleRoute roles={['admin','hr','employee']}><Meetings /></RoleRoute>} />
+            <Route path="/reviews"      element={<RoleRoute roles={['admin','hr','employee']}><Reviews /></RoleRoute>} />
+            <Route path="/profile"      element={<RoleRoute roles={['admin','hr','employee','candidate']}><Profile /></RoleRoute>} />
+            <Route path="/notifications" element={<RoleRoute roles={['admin','hr','employee','candidate']}><Notifications /></RoleRoute>} />
 
-          <Route path="/dashboard"    element={<Navigate to="/" replace />} />
-        </Routes>
+            <Route path="/dashboard"    element={<Navigate to="/" replace />} />
+          </Routes>
+        </AnimatePresence>
       </main>
     </div>
   )
@@ -128,9 +140,11 @@ function AppShell() {
 function App() {
   return (
     <BrowserRouter>
+      <Toaster richColors theme="dark" position="top-right" />
       <SessionProvider>
         <Routes>
-          {/* Public routes — redirect to dashboard if already logged in */}
+          {/* Public routes */}
+          <Route path="/"                element={<LandingPage />} />
           <Route path="/login"           element={<GuestRoute><LoginPage /></GuestRoute>} />
           <Route path="/register"        element={<GuestRoute><Register /></GuestRoute>} />
           <Route path="/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />

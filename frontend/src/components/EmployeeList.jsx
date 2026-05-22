@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { deleteEmployee } from '../services/api'
+import { EmptyState } from './ui/EmptyState'
+import { StatusBadge } from './ui/StatusBadge'
+import { Users, Edit2, Trash2, Calendar } from 'lucide-react'
+import { toast } from 'sonner'
 
-const AVATAR_COLORS = ['#6366f1', '#2563eb', '#059669', '#d97706', '#dc2626', '#0891b2', '#be185d', '#8b5cf6']
-const STATUS_CLASSES = { Active: 'success', Inactive: 'warning', 'On Leave': 'info', Deactivated: 'danger' }
+const AVATAR_COLORS = ['#8b5cf6', '#a78bfa', '#6d28d9', '#4c1d95', '#c4b5fd']
 
 function getColor(name) {
   let h = 0; for (let c of (name || '')) h += c.charCodeAt(0)
@@ -18,14 +21,15 @@ export default function EmployeeList({ employees, onEdit, onSchedule, onRefresh,
 
   const handleDelete = async (id) => {
     if (!confirm('Delete this employee? Their data will be permanently removed.')) return
-    try { await deleteEmployee(id); onRefresh() } catch (e) { alert('Error deleting employee') }
+    try { await deleteEmployee(id); toast.success('Employee removed'); onRefresh() } catch (e) { toast.error('Error deleting employee') }
   }
 
   if (!employees.length) return (
-    <div className="empty-state" style={{ padding: '60px 0' }}>
-      <div className="empty-icon" style={{ fontSize: 48, marginBottom: 16 }}>👥</div>
-      <p style={{ fontSize: 16, color: 'var(--text-muted)' }}>No employees found matching your criteria.</p>
-    </div>
+    <EmptyState 
+      icon={Users} 
+      title="No employees found" 
+      description="We couldn't find any employees matching your current criteria." 
+    />
   )
 
   const totalPages = Math.ceil(employees.length / itemsPerPage)
@@ -63,10 +67,7 @@ export default function EmployeeList({ employees, onEdit, onSchedule, onRefresh,
                   <div className="emp-email-text">{emp.department || 'Engineering'}</div>
                 </td>
                 <td>
-                  <span className={`status-badge ${STATUS_CLASSES[emp.status || 'Active']}`}>
-                    <span className="status-dot"></span>
-                    {emp.status || 'Active'}
-                  </span>
+                  <StatusBadge status={emp.status || 'Active'} />
                 </td>
                 <td>
                   <div className="skills-cell">
@@ -76,9 +77,9 @@ export default function EmployeeList({ employees, onEdit, onSchedule, onRefresh,
                 </td>
                 <td>
                   <div className="action-buttons">
-                    <button className="btn-icon edit" onClick={() => onEdit(emp)}>✏️</button>
-                    <button className="btn-icon delete" onClick={() => handleDelete(emp._id)}>🗑️</button>
-                    <button className="btn-icon schedule" onClick={() => onSchedule(emp)}>📅</button>
+                    <button className="btn-icon edit" onClick={() => onEdit(emp)}><Edit2 size={16} /></button>
+                    <button className="btn-icon delete" onClick={() => handleDelete(emp._id)}><Trash2 size={16} /></button>
+                    <button className="btn-icon schedule" onClick={() => onSchedule(emp)}><Calendar size={16} /></button>
                   </div>
                 </td>
               </tr>
@@ -94,11 +95,9 @@ export default function EmployeeList({ employees, onEdit, onSchedule, onRefresh,
       {paginatedEmps.map(emp => {
         const skills = (emp.skills || '').split(',').map(s => s.trim()).filter(Boolean)
         return (
-          <div key={emp._id} className="employee-card">
-            <div className="card-status">
-              <span className={`status-badge ${STATUS_CLASSES[emp.status || 'Active']}`}>
-                <span className="status-dot"></span>
-              </span>
+          <div key={emp._id} className="employee-card card" style={{ padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative' }}>
+            <div className="card-status" style={{ position: 'absolute', top: 16, right: 16 }}>
+              <StatusBadge status={emp.status || 'Active'} />
             </div>
             {emp.image_url ? (
               <img src={emp.image_url} alt={emp.name} className="card-avatar" style={{ objectFit: 'cover' }} />
@@ -111,10 +110,10 @@ export default function EmployeeList({ employees, onEdit, onSchedule, onRefresh,
             <div className="card-skills">
               {skills.slice(0, 3).map(s => <span key={s} className="skill-tag">{s}</span>)}
             </div>
-            <div className="card-actions">
-              <button className="btn-icon edit" onClick={() => onEdit(emp)}>✏️</button>
-              <button className="btn-icon delete" onClick={() => handleDelete(emp._id)}>🗑️</button>
-              <button className="btn-icon schedule" onClick={() => onSchedule(emp)}>📅</button>
+            <div className="card-actions" style={{ marginTop: 24, display: 'flex', gap: 12, justifyContent: 'center', borderTop: '1px solid var(--border)', paddingTop: 16, width: '100%' }}>
+              <button className="btn-icon edit" onClick={() => onEdit(emp)}><Edit2 size={16} /></button>
+              <button className="btn-icon delete" onClick={() => handleDelete(emp._id)}><Trash2 size={16} /></button>
+              <button className="btn-icon schedule" onClick={() => onSchedule(emp)}><Calendar size={16} /></button>
             </div>
           </div>
         )

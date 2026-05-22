@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 import { getStats, getEmployees, getUpcomingInterviews, getLeaves, getCurrentUser, getUpcomingMeetings } from '../services/api'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, CartesianGrid } from 'recharts'
+import { motion } from 'framer-motion'
+import { PageWrapper } from '../components/ui/PageWrapper'
+import { Card } from '../components/ui/Card'
+import { EmptyState } from '../components/ui/EmptyState'
+import { SkeletonGrid } from '../components/ui/SkeletonLoader'
+import { Users, Calendar, Clock, Inbox, CheckCircle2 } from 'lucide-react'
 
 const COLORS = ['#6366f1','#2563eb','#059669','#d97706','#dc2626','#0891b2','#be185d','#64748b']
 const getColor = n => { let h=0; for(let c of (n||'')) h+=c.charCodeAt(0); return COLORS[h%COLORS.length] }
@@ -28,7 +34,7 @@ function useCountUp(end, duration = 1500) {
 function StatCard({ icon, value, label, colorClass, trend }) {
   const animatedValue = useCountUp(value || 0);
   return (
-    <div className={`stat-card ${colorClass}`}>
+    <Card hoverEffect className={`stat-card ${colorClass}`}>
       <div className="stat-card-glow"></div>
       <div className="stat-content">
         <div className="stat-icon-wrapper">
@@ -44,12 +50,12 @@ function StatCard({ icon, value, label, colorClass, trend }) {
           )}
         </div>
       </div>
-    </div>
+    </Card>
   )
 }
 
 function RoleChart({ data }) {
-  if (!data || !data.length) return <div className="empty-state" style={{padding:30}}><p>No data yet</p></div>
+  if (!data || !data.length) return <EmptyState icon={Users} title="No roles yet" description="Add employees to see the distribution" />
   return (
     <div style={{ width: '100%', height: 260 }}>
       <ResponsiveContainer>
@@ -96,7 +102,7 @@ function HiringTrendChart() {
     { month: 'Jun', hired: 15, applications: 89 },
   ];
   return (
-    <div className="card" style={{ gridColumn: '1 / -1', marginBottom: 24 }}>
+    <Card hoverEffect style={{ gridColumn: '1 / -1', marginBottom: 24 }}>
       <div className="card-header">
         <div>
           <h3>Hiring & Application Trends</h3>
@@ -125,7 +131,7 @@ function HiringTrendChart() {
           </AreaChart>
         </ResponsiveContainer>
       </div>
-    </div>
+    </Card>
   )
 }
 
@@ -138,7 +144,15 @@ export default function Dashboard() {
   const [empByRole, setEmpByRole]   = useState([])
   const [loading, setLoading]       = useState(true)
   const navigate = useNavigate()
+  const location = useLocation()
   
+  const showWelcomeTrial = location.state?.showWelcomeTrial
+  let trialDaysLeft = null;
+  const trialEndStr = location.state?.trialEndDate || getCurrentUser()?.trialEndDate;
+  if (trialEndStr) {
+    trialDaysLeft = Math.ceil((new Date(trialEndStr) - new Date()) / (1000 * 60 * 60 * 24));
+  }
+
   const user = getCurrentUser() || {}
   const isHR        = user.role === 'admin' || user.role === 'hr'
   const isCandidate = user.role === 'candidate'
@@ -178,32 +192,30 @@ export default function Dashboard() {
   }, [isHR])
 
   if (loading) return (
-    <div className="page-content">
+    <PageWrapper>
       <div className="page-header">
-        <div className="skeleton skeleton-title"></div>
+        <h1 className="page-title">Loading...</h1>
       </div>
-      <div className="stats-grid">
-        {[1,2,3,4].map(i => (
-          <div key={i} className="stat-card">
-            <div className="skeleton-avatar skeleton"></div>
-            <div style={{flex:1}}>
-              <div className="skeleton-text skeleton" style={{width: '80%'}}></div>
-              <div className="skeleton-text skeleton" style={{width: '40%'}}></div>
-            </div>
-          </div>
-        ))}
+      <SkeletonGrid count={4} />
+      <div style={{ marginTop: 24 }}>
+        <SkeletonGrid count={2} />
       </div>
-      <div className="dashboard-grid">
-        <div className="card skeleton" style={{height: 300}}></div>
-        <div className="card skeleton" style={{height: 300}}></div>
-      </div>
-    </div>
+    </PageWrapper>
   )
+
+  const staggerContainer = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+  }
+  const staggerItem = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+  }
 
   if (!isHR) {
     // ── EMPLOYEE PORTAL VIEW ──
     return (
-      <div className="page-content page-fade-in">
+      <PageWrapper>
         <div className="page-header">
           <div>
             <h1 className="page-title">Employee Portal</h1>
@@ -215,15 +227,15 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="stats-grid">
-          <StatCard icon="📅" value={upcomingMeets.length} label="My Meetings" colorClass="primary" />
-          <StatCard icon="🌴" value={pendingLeaves}      label="Pending Leaves" colorClass="warning" />
-          <StatCard icon="⭐" value={4.8}                label="Performance Score" colorClass="success" />
-          <StatCard icon="🏆" value={12}                label="Tasks Completed" colorClass="info" />
-        </div>
+        <motion.div variants={staggerContainer} initial="hidden" animate="show" className="stats-grid">
+          <motion.div variants={staggerItem}><StatCard icon="📅" value={upcomingMeets.length} label="My Meetings" colorClass="primary" /></motion.div>
+          <motion.div variants={staggerItem}><StatCard icon="🌴" value={pendingLeaves}      label="Pending Leaves" colorClass="warning" /></motion.div>
+          <motion.div variants={staggerItem}><StatCard icon="⭐" value={4.8}                label="Performance Score" colorClass="success" /></motion.div>
+          <motion.div variants={staggerItem}><StatCard icon="🏆" value={12}                label="Tasks Completed" colorClass="info" /></motion.div>
+        </motion.div>
 
-        <div className="dashboard-grid">
-          <div className="card" style={{ gridColumn: 'span 2' }}>
+        <div className="dashboard-grid" style={{ marginTop: 24 }}>
+          <Card hoverEffect style={{ gridColumn: 'span 2' }}>
             <div className="card-header">
               <h3>Company Announcements</h3>
             </div>
@@ -242,16 +254,16 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
 
-          <div className="card">
+          <Card hoverEffect>
             <div className="card-header">
               <h3>Upcoming Meetings</h3>
               <button className="link-btn" onClick={()=>navigate('/meetings')}>View All</button>
             </div>
             <div className="recent-list">
               {upcomingMeets.length === 0 
-                ? <div className="empty-state" style={{padding:20}}><p>No meetings today</p></div>
+                ? <EmptyState icon={Calendar} title="No meetings today" description="Take a break or focus on deep work." />
                 : upcomingMeets.map(m => (
                   <div key={m._id} className="recent-item">
                     <div className="avatar" style={{background:'var(--primary-glow)', color:'var(--primary)'}}>🤝</div>
@@ -264,30 +276,30 @@ export default function Dashboard() {
                 ))
               }
             </div>
-          </div>
+          </Card>
         </div>
 
         <div className="stats-grid" style={{ marginTop: 24 }}>
-          <div className="card glass" style={{ gridColumn: 'span 3', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Card hoverEffect className="glass" style={{ gridColumn: 'span 3', padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div className="stat-icon-wrapper" style={{ background: 'var(--primary-glow)', fontSize: 24 }}>🔔</div>
+              <div className="stat-icon-wrapper" style={{ background: 'var(--primary-glow)', fontSize: 24, color: 'var(--primary)' }}><Inbox /></div>
               <div>
                 <h4 style={{ margin: 0, fontSize: 16 }}>Pending Notifications</h4>
                 <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>You have several unread alerts in your inbox.</p>
               </div>
             </div>
             <button className="btn-primary" onClick={() => navigate('/notifications')}>Open Notifications</button>
-          </div>
+          </Card>
         </div>
 
-        <div className="card" style={{ marginTop: 24 }}>
+        <Card hoverEffect style={{ marginTop: 24 }}>
           <div className="card-header">
             <h3>Recent Activity</h3>
           </div>
           <div className="activity-feed">
              {upcomingMeets.length === 0 ? (
                <div className="activity-item">
-                 <div className="activity-icon blue">✨</div>
+                 <div className="activity-icon blue"><CheckCircle2 size={16} /></div>
                  <div className="activity-content">
                    <div className="activity-title">All caught up!</div>
                    <div className="activity-desc">No recent activity to show for today.</div>
@@ -295,7 +307,7 @@ export default function Dashboard() {
                </div>
              ) : upcomingMeets.slice(0, 3).map(m => (
               <div key={m._id} className="activity-item">
-                <div className={`activity-icon blue`}>🤝</div>
+                <div className={`activity-icon blue`}><Clock size={16} /></div>
                 <div className="activity-content">
                   <div className="activity-title">Meeting Scheduled <span className={`activity-badge blue`}>MEETING</span></div>
                   <div className="activity-desc">"{m.title}" is scheduled for {m.date} at {m.time}.</div>
@@ -304,8 +316,8 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-        </div>
-      </div>
+        </Card>
+      </PageWrapper>
     )
   }
 
@@ -317,7 +329,28 @@ export default function Dashboard() {
   ]
 
   return (
-    <div className="page-content page-fade-in">
+    <PageWrapper>
+      {showWelcomeTrial && (
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} style={{
+          background: 'linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%)',
+          color: 'white',
+          padding: '16px 24px',
+          borderRadius: 16,
+          marginBottom: 24,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          boxShadow: '0 8px 32px rgba(99, 102, 241, 0.4)'
+        }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Welcome to HR Recruiter Pro! 🎉</h2>
+            <p style={{ margin: 0, fontSize: 14, opacity: 0.9, marginTop: 4 }}>
+              Your account is fully secured and ready. You have {trialDaysLeft} days remaining in your premium trial.
+            </p>
+          </div>
+        </motion.div>
+      )}
+
       <div className="page-header">
         <div>
           <h1 className="page-title">Admin Dashboard</h1>
@@ -329,23 +362,23 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="stats-grid">
-        <StatCard icon="👥" value={stats.totalEmployees} label="Total Employees" colorClass="primary" trend={{value: 8, positive: true}}/>
-        <StatCard icon="📅" value={stats.scheduled}      label="Interviews Scheduled" colorClass="success" trend={{value: 12, positive: true}}/>
-        <StatCard icon="⏰" value={upcomingInts.length}  label="Upcoming Interviews"  colorClass="warning" trend={{value: 5, positive: false}}/>
-        <StatCard icon="🌴" value={pendingLeaves}         label="Pending Leaves"       colorClass="danger"/>
-      </div>
+      <motion.div variants={staggerContainer} initial="hidden" animate="show" className="stats-grid">
+        <motion.div variants={staggerItem}><StatCard icon="👥" value={stats.totalEmployees} label="Total Employees" colorClass="primary" trend={{value: 8, positive: true}}/></motion.div>
+        <motion.div variants={staggerItem}><StatCard icon="📅" value={stats.scheduled}      label="Interviews Scheduled" colorClass="success" trend={{value: 12, positive: true}}/></motion.div>
+        <motion.div variants={staggerItem}><StatCard icon="⏰" value={upcomingInts.length}  label="Upcoming Interviews"  colorClass="warning" trend={{value: 5, positive: false}}/></motion.div>
+        <motion.div variants={staggerItem}><StatCard icon="🌴" value={pendingLeaves}         label="Pending Leaves"       colorClass="danger"/></motion.div>
+      </motion.div>
 
       <HiringTrendChart />
       
       <div className="dashboard-grid" style={{marginBottom:24}}>
-        <div className="card">
+        <Card hoverEffect>
           <div className="card-header"><h3>Employees by Role</h3></div>
           <div style={{padding:'20px 24px'}}>
             <RoleChart data={empByRole}/>
           </div>
-        </div>
-        <div className="card">
+        </Card>
+        <Card hoverEffect>
           <div className="card-header"><h3>Interview Status</h3></div>
           <div style={{padding:'16px 24px',display:'flex',alignItems:'center',gap:28}}>
             <DonutChart data={donutData}/>
@@ -363,15 +396,15 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
-        </div>
+        </Card>
       </div>
 
       <div className="dashboard-grid">
-        <div className="card">
+        <Card hoverEffect>
           <div className="card-header"><h3>Recent Employees</h3><button className="link-btn" onClick={()=>navigate('/employees')}>View All →</button></div>
           <div className="recent-list">
             {recentEmps.length===0
-              ? <div className="empty-state" style={{padding:30}}><div className="empty-icon">👥</div><p>No employees yet</p></div>
+              ? <EmptyState icon={Users} title="No employees yet" description="Start building your team." />
               : recentEmps.map(e=>(
                 <div key={e._id} className="recent-item">
                   <div className="avatar" style={{background:getColor(e.name)}}>{getInit(e.name)}</div>
@@ -381,12 +414,12 @@ export default function Dashboard() {
               ))
             }
           </div>
-        </div>
-        <div className="card">
+        </Card>
+        <Card hoverEffect>
           <div className="card-header"><h3>Upcoming Interviews</h3><button className="link-btn" onClick={()=>navigate('/interviews')}>View All →</button></div>
           <div className="recent-list">
             {upcomingInts.length===0
-              ? <div className="empty-state" style={{padding:30}}><div className="empty-icon">📅</div><p>No upcoming</p></div>
+              ? <EmptyState icon={Calendar} title="No upcoming interviews" description="Schedule an interview to see it here." />
               : upcomingInts.map(i=>{
                 const nm=i.employee?.name||'Unknown'
                 const d=new Date(i.date+'T00:00:00')
@@ -402,8 +435,8 @@ export default function Dashboard() {
               })
             }
           </div>
-        </div>
+        </Card>
       </div>
-    </div>
+    </PageWrapper>
   )
 }

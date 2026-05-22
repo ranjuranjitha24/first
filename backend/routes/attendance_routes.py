@@ -18,7 +18,7 @@ def get_attendance(
     else:
         emp_id = employee_id
     
-    return {"success": True, "data": ctrl.get_attendance(emp_id, date, search)}
+    return {"success": True, "data": ctrl.get_attendance(emp_id, date, search, company_id=user.get("company_id"))}
 
 @router.get("/stats")
 def get_stats(employee_id: str = Query(None), user: dict = Depends(get_current_user_required)):
@@ -29,7 +29,7 @@ def get_stats(employee_id: str = Query(None), user: dict = Depends(get_current_u
     else:
         emp_id = employee_id
         
-    return {"success": True, "data": ctrl.get_attendance_stats(emp_id)}
+    return {"success": True, "data": ctrl.get_attendance_stats(emp_id, company_id=user.get("company_id"))}
 
 @router.post("/check")
 def attendance_check(data: AttendanceCheck, user: dict = Depends(get_current_user_required)):
@@ -37,5 +37,5 @@ def attendance_check(data: AttendanceCheck, user: dict = Depends(get_current_use
     if user.get("role") == "employee" and data.employee_id != user.get("employee_id"):
         return {"success": False, "message": "Unauthorized"}
         
-    res = ctrl.check_in_out(data.employee_id, data.type)
+    res = ctrl.check_in_out(data.employee_id, data.type, company_id=user.get("company_id"))
     return {"success": True, "data": res}

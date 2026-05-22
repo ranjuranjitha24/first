@@ -13,6 +13,10 @@ def register(data: UserCreate):
 def login(data: UserLogin):
     return {"success": True, "data": ctrl.login_user(data)}
 
+@router.post("/setup-password")
+def setup_password(data: ctrl.SetupPasswordRequest):
+    return {"success": True, "data": ctrl.setup_password(data)}
+
 # ── Candidate (email-based) ──
 @router.post("/candidate/register")
 def candidate_register(data: CandidateRegister):

@@ -9,7 +9,11 @@ def serialize(doc) -> dict:
     # Robustly join employee name and username if missing
     if not doc.get("employee_name") or doc.get("employee_name") == "Unknown" or not doc.get("employee_username"):
         try:
-            emp = employees_col.find_one({"_id": ObjectId(doc.get("employee_id"))})
+            emp_query = {"_id": ObjectId(doc.get("employee_id"))}
+            # For serialize we might not have company_id readily available unless passed,
+            # but attendance controller isn't passing company_id to serialize.
+            # Let's add it to serialize signature if needed, or rely on _id.
+            emp = employees_col.find_one(emp_query)
             if emp:
                 doc["employee_name"] = emp.get("name", "Unknown")
                 doc["employee_username"] = emp.get("username", "Unknown")
@@ -29,8 +33,9 @@ def serialize(doc) -> dict:
             pass
     return doc
 
-def get_attendance(employee_id: str = None, date: str = None, search: str = ""):
+def get_attendance(employee_id: str = None, date: str = None, search: str = "", company_id: str = None):
     query = {}
+    if company_id: query["company_id"] = company_id
     if employee_id: 
         query["employee_id"] = employee_id
     if date: 
@@ -45,12 +50,14 @@ def get_attendance(employee_id: str = None, date: str = None, search: str = ""):
         
     return results
 
-def check_in_out(employee_id: str, type: str):
+def check_in_out(employee_id: str, type: str, company_id: str = None):
     now = datetime.now()
     today_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%I:%M %p")
     
-    record = attendance_col.find_one({"employee_id": employee_id, "date": today_str})
+    query = {"employee_id": employee_id, "date": today_str}
+    if company_id: query["company_id"] = company_id
+    record = attendance_col.find_one(query)
     
     if type == "check-in":
         if record:
@@ -90,6 +97,7 @@ def check_in_out(employee_id: str, type: str):
             "check_out": None,
             "work_hours": 0
         }
+        if company_id: new_record["company_id"] = company_id
         attendance_col.insert_one(new_record)
         return {"message": f"Checked in at {time_str}", "status": status}
     
@@ -109,8 +117,10 @@ def check_in_out(employee_id: str, type: str):
         )
         return {"message": f"Checked out at {time_str}", "hours": round(duration, 2)}
 
-def get_attendance_stats(employee_id: str = None):
+def get_attendance_stats(employee_id: str = None, company_id: str = None):
     query = {}
+    if company_id: query["company_id"] = company_id
+    
     if employee_id:
         query["employee_id"] = employee_id
         docs = list(attendance_col.find(query))
@@ -122,14 +132,21 @@ def get_attendance_stats(employee_id: str = None):
     else:
         # Admin stats for today
         today = datetime.now().strftime("%Y-%m-%d")
-        all_emps = list(employees_col.find({"role": "employee"}, {"name": 1, "username": 1}))
+        emp_query = {"role": "employee"}
+        if company_id: emp_query["company_id"] = company_id
+        all_emps = list(employees_col.find(emp_query, {"name": 1, "username": 1}))
         total_employees = len(all_emps)
         
-        present_docs = list(attendance_col.find({"date": today}))
+        att_query = {"date": today}
+        if company_id: att_query["company_id"] = company_id
+        
+        present_docs = list(attendance_col.find(att_query))
         present_ids = {d["employee_id"] for d in present_docs}
         
         present_today = len(present_ids)
-        late_today = attendance_col.count_documents({"date": today, "status": "Late"})
+        late_query = {"date": today, "status": "Late"}
+        if company_id: late_query["company_id"] = company_id
+        late_today = attendance_col.count_documents(late_query)
         
         absent_employees = [e["name"] for e in all_emps if str(e["_id"]) not in present_ids]
         

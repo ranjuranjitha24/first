@@ -1,7 +1,8 @@
 import { NavLink } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import ThemeToggle from './ThemeToggle'
 import { useSession } from '../context/SessionContext'
+import { motion, AnimatePresence } from 'framer-motion'
+import { LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
 
 const allNavItems = [
   // Shared / Role-specific
@@ -17,6 +18,7 @@ const allNavItems = [
   { path: '/meetings',        icon: '🤝', label: 'Meetings',         roles: ['admin', 'hr', 'employee'] },
   { path: '/payroll',         icon: '💰', label: 'Payroll',         roles: ['admin', 'hr', 'employee'] },
   { path: '/analytics',       icon: '📈', label: 'Analytics',       roles: ['admin', 'hr'] },
+  { path: '/admin/demo-requests', icon: '📋', label: 'Demo Requests', roles: ['admin', 'hr'] },
   { path: '/reviews',         icon: '⭐', label: 'Reviews',        roles: ['employee'] },
   
   // Candidate Specific
@@ -46,46 +48,93 @@ export default function Sidebar() {
   const initial = displayName[0].toUpperCase()
 
   return (
-    <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
+    <motion.aside 
+      layout
+      initial={false}
+      animate={{ width: isCollapsed ? 88 : 260 }}
+      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+      className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}
+      style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+    >
       <div className="sidebar-logo">
-        <div className="logo-icon">HR</div>
-        {!isCollapsed && <span className="logo-text">RecruiterPro</span>}
+        <div className="logo-icon" style={{ flexShrink: 0 }}>HR</div>
+        <AnimatePresence mode="wait">
+          {!isCollapsed && (
+            <motion.span 
+              initial={{ opacity: 0, width: 0 }} 
+              animate={{ opacity: 1, width: 'auto' }} 
+              exit={{ opacity: 0, width: 0 }} 
+              className="logo-text" 
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              RecruiterPro
+            </motion.span>
+          )}
+        </AnimatePresence>
         <button 
           className="collapse-btn" 
           onClick={() => setIsCollapsed(!isCollapsed)}
           title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
         >
-          {isCollapsed ? '»' : '«'}
+          {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
         </button>
       </div>
 
-      <nav className="sidebar-nav">
+      <nav className="sidebar-nav" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
         {navItems.map(item => (
           <NavLink key={item.path} to={item.path}
             className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
-            title={isCollapsed ? item.label : ''}>
-            <span className="nav-icon">{item.icon}</span>
-            {!isCollapsed && <span className="nav-label">{item.label}</span>}
+            title={isCollapsed ? item.label : ''}
+          >
+            <span className="nav-icon" style={{ flexShrink: 0 }}>{item.icon}</span>
+            <AnimatePresence>
+              {!isCollapsed && (
+                <motion.span 
+                  initial={{ opacity: 0, x: -10 }} 
+                  animate={{ opacity: 1, x: 0 }} 
+                  exit={{ opacity: 0, x: -10 }} 
+                  className="nav-label" 
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  {item.label}
+                </motion.span>
+              )}
+            </AnimatePresence>
           </NavLink>
         ))}
       </nav>
 
       <div className="sidebar-bottom">
-        <div className="sidebar-theme-toggle" style={{ padding: isCollapsed ? '10px 0' : '10px 24px', display: 'flex', alignItems: 'center', justifyContent: isCollapsed ? 'center' : 'space-between' }}>
-          {!isCollapsed && <span className="nav-label" style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-muted)' }}>Theme</span>}
-          <ThemeToggle collapsed={isCollapsed} />
-        </div>
-        <div className="sidebar-footer">
-          <div className="user-avatar">{initial}</div>
+        <div className="sidebar-footer" style={{ borderTop: '1px solid var(--border)', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: isCollapsed ? 'center' : 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div className="user-avatar" style={{ flexShrink: 0 }}>{initial}</div>
+            <AnimatePresence>
+              {!isCollapsed && (
+                <motion.div 
+                  initial={{ opacity: 0, width: 0 }} 
+                  animate={{ opacity: 1, width: 'auto' }} 
+                  exit={{ opacity: 0, width: 0 }} 
+                  className="user-info"
+                  style={{ whiteSpace: 'nowrap', overflow: 'hidden' }}
+                >
+                  <div className="user-name">{displayName}</div>
+                  <div className="user-role">{role}</div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
           {!isCollapsed && (
-            <div className="user-info">
-              <div className="user-name">{displayName}</div>
-              <div className="user-role">{role}</div>
-            </div>
+            <motion.button 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              className="logout-btn" onClick={logout} title="Logout"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+            >
+              <LogOut size={18} />
+            </motion.button>
           )}
-          <button className="logout-btn" onClick={logout} title="Logout">🚪</button>
         </div>
       </div>
-    </aside>
+    </motion.aside>
   )
 }

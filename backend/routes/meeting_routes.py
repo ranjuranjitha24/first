@@ -22,21 +22,21 @@ def list_meetings(
     else:
         emp_id = employee_id
         
-    return {"success": True, "data": ctrl.get_all_meetings(emp_id, status)}
+    return {"success": True, "data": ctrl.get_all_meetings(emp_id, status, company_id=user.get("company_id"))}
 
 @router.post("/")
 def schedule_meeting(data: MeetingCreate, user: dict = Depends(check_admin)):
-    return {"success": True, "data": ctrl.create_meeting(data)}
+    return {"success": True, "data": ctrl.create_meeting(data, company_id=user.get("company_id"))}
 
 @router.put("/{mid}")
 def update_meeting(mid: str, data: MeetingUpdate, user: dict = Depends(get_current_user_required)):
     # Basic protection: only Admin/HR or the assigned employee can update status?
     # Usually only Admin/HR should reschedule.
-    return {"success": True, "data": ctrl.update_meeting(mid, data)}
+    return {"success": True, "data": ctrl.update_meeting(mid, data, company_id=user.get("company_id"))}
 
 @router.delete("/{mid}")
 def delete_meeting(mid: str, user: dict = Depends(check_admin)):
-    return {"success": True, "data": ctrl.delete_meeting(mid)}
+    return {"success": True, "data": ctrl.delete_meeting(mid, company_id=user.get("company_id"))}
 
 @router.get("/upcoming")
 def upcoming_meetings(user: dict = Depends(get_current_user_required)):
@@ -47,4 +47,4 @@ def upcoming_meetings(user: dict = Depends(get_current_user_required)):
         if emp: emp_id = str(emp["_id"])
         
     if not emp_id: return {"success": False, "message": "Not an employee"}
-    return {"success": True, "data": ctrl.get_upcoming_meetings(emp_id)}
+    return {"success": True, "data": ctrl.get_upcoming_meetings(emp_id, company_id=user.get("company_id"))}

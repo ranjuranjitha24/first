@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getNotifications, getPortalNotifications, getUnreadCount, markRead, markAllRead } from '../services/api'
 import { useSession } from '../context/SessionContext'
+import { Clock } from 'lucide-react'
 
 export default function TopNav() {
   const [showNotif, setShowNotif] = useState(false)
@@ -70,8 +71,29 @@ export default function TopNav() {
   const displayName = user?.full_name || user?.username || 'HR Admin'
   const initial     = displayName.charAt(0).toUpperCase()
 
+  // Calculate remaining trial days
+  let trialDaysLeft = null;
+  if (user?.isDemoUser && user?.trialEndDate) {
+    const end = new Date(user.trialEndDate);
+    const now = new Date();
+    trialDaysLeft = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+  }
+
   return (
-    <nav className="top-nav">
+    <div className="flex flex-col w-full">
+      {/* SaaS Trial Banner */}
+      {user?.isDemoUser && trialDaysLeft !== null && (
+        <div className={`px-4 py-2 flex items-center justify-center gap-2 text-xs font-bold ${trialDaysLeft <= 0 ? 'bg-red-500/20 text-red-400' : 'bg-indigo-500/20 text-indigo-400'}`}>
+          <Clock size={14} />
+          {trialDaysLeft <= 0 
+            ? 'Your trial has expired. Upgrade to restore access.'
+            : `${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} left in your ${user.planType || 'Starter'} trial.`
+          }
+          <a href="/#contact" className="ml-2 underline text-white">Upgrade Now</a>
+        </div>
+      )}
+      
+      <nav className="top-nav w-full">
       {/* Toast notification popup */}
       {toast.show && (
         <div
@@ -154,5 +176,6 @@ export default function TopNav() {
         </div>
       </div>
     </nav>
+    </div>
   )
 }

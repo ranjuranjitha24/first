@@ -42,8 +42,11 @@ def mark_read(notif_id: str, user: dict = Depends(get_current_user_required)):
 
 # ── Jobs ──────────────────────────────────────────────────────
 @router.get("/jobs")
-def get_public_jobs():
-    jobs = list(jobs_col.find({"status": "Open"}).sort("createdAt", -1))
+def get_public_jobs(user: dict = Depends(get_current_user_required)):
+    query = {"status": "Open"}
+    company_id = user.get("company_id")
+    if company_id: query["company_id"] = company_id
+    jobs = list(jobs_col.find(query).sort("createdAt", -1))
     return {"success": True, "data": [serialize(j) for j in jobs]}
 
 
