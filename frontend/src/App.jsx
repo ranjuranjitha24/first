@@ -28,6 +28,7 @@ import Careers          from './pages/Careers'
 import Login            from './pages/Login'
 import Register         from './pages/Register'
 import ForgotPassword   from './pages/ForgotPassword'
+import ResetPassword    from './pages/ResetPassword'
 import LandingPage      from './pages/LandingPage'
 import DemoRequests     from './pages/DemoRequests'
 
@@ -152,6 +153,7 @@ function App() {
           <Route path="/login"           element={<GuestRoute><LoginPage /></GuestRoute>} />
           <Route path="/register"        element={<GuestRoute><Register /></GuestRoute>} />
           <Route path="/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
+          <Route path="/reset-password"  element={<GuestRoute><ResetPassword /></GuestRoute>} />
 
           {/* /careers — public, but logged-in candidates go to /jobs/available */}
           <Route path="/careers" element={<GuestRoute><Careers /></GuestRoute>} />

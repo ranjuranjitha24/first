@@ -9,6 +9,8 @@ from config.db import users_col, notifications_col
 from models.user_model import UserCreate, UserLogin, CandidateRegister, CandidateLogin, SetupPasswordRequest
 from fastapi import HTTPException
 import bcrypt
+import os
+from utils.email_utils import send_reset_email
 
 # ── Helpers ──────────────────────────────────────────────────
 
@@ -228,32 +230,38 @@ def login_candidate(data: CandidateLogin) -> dict:
 
 
 # ── Forgot / Reset password (email-based) ────────────────────
-# Simple token stored in DB — no SMTP required for demo; token shown in response
-# In production, email the reset link.
+# Token is hashed before storing in DB for security.
+# An email is sent to the user with the unhashed token in the reset link.
 
 def forgot_password(email: str) -> dict:
     user = users_col.find_one({"email": email, "role": "candidate"})
     if not user:
         # Return generic message to avoid user enumeration
-        return {"message": "If an account exists, a reset link has been sent."}
+        return {"message": "If an account exists, a reset link has been sent to your email."}
 
     reset_token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(reset_token.encode()).hexdigest()
     expiry = int(time.time()) + 3600  # 1 hour
 
     users_col.update_one(
         {"email": email},
-        {"$set": {"reset_token": reset_token, "reset_token_exp": expiry}}
+        {"$set": {"reset_token_hash": token_hash, "reset_token_exp": expiry}}
     )
 
-    # In production: send email. For demo, return token directly.
+    # Send email
+    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+    reset_link = f"{frontend_url}/reset-password?token={reset_token}"
+    send_reset_email(email, reset_link)
+
     return {
-        "message": "Password reset token generated.",
-        "reset_token": reset_token   # Remove this in production; send via email
+        "message": "If an account exists, a reset link has been sent to your email."
     }
 
 
 def reset_password(token: str, new_password: str) -> dict:
-    user = users_col.find_one({"reset_token": token})
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    user = users_col.find_one({"reset_token_hash": token_hash})
+    
     if not user:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
     if user.get("reset_token_exp", 0) < time.time():
@@ -263,7 +271,7 @@ def reset_password(token: str, new_password: str) -> dict:
         {"username": user["username"]},
         {
             "$set": {"password": hash_pw_secure(new_password)},
-            "$unset": {"reset_token": "", "reset_token_exp": ""}
+            "$unset": {"reset_token_hash": "", "reset_token_exp": "", "reset_token": ""}
         }
     )
     return {"message": "Password successfully reset. You can now login."}
