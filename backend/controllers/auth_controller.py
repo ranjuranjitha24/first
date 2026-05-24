@@ -234,11 +234,14 @@ def login_candidate(data: CandidateLogin) -> dict:
 # An email is sent to the user with the unhashed token in the reset link.
 
 def forgot_password(email: str) -> dict:
+    print(f"\n[AUTH CONTROLLER] Processing forgot_password for: {email}")
     user = users_col.find_one({"email": email, "role": "candidate"})
     if not user:
+        print(f"[AUTH CONTROLLER WARNING] No candidate found with email: {email}")
         # Return generic message to avoid user enumeration
         return {"message": "If an account exists, a reset link has been sent to your email."}
 
+    print("[AUTH CONTROLLER] User found. Generating token...")
     reset_token = secrets.token_urlsafe(32)
     token_hash = hashlib.sha256(reset_token.encode()).hexdigest()
     expiry = int(time.time()) + 3600  # 1 hour
@@ -247,11 +250,19 @@ def forgot_password(email: str) -> dict:
         {"email": email},
         {"$set": {"reset_token_hash": token_hash, "reset_token_exp": expiry}}
     )
+    print("[AUTH CONTROLLER] Token hashed and stored in database successfully.")
 
     # Send email
     frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:5173")
     reset_link = f"{frontend_url}/reset-password?token={reset_token}"
-    send_reset_email(email, reset_link)
+    
+    print("[AUTH CONTROLLER] Initiating email delivery...")
+    success = send_reset_email(email, reset_link)
+    
+    if success:
+        print("[AUTH CONTROLLER] Forgot password flow completed successfully.")
+    else:
+        print("[AUTH CONTROLLER ERROR] Email delivery failed, but returning generic success message to client for security.")
 
     return {
         "message": "If an account exists, a reset link has been sent to your email."
