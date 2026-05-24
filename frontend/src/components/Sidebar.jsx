@@ -4,30 +4,36 @@ import { useSession } from '../context/SessionContext'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
 
+import { 
+  LayoutDashboard, Users, Briefcase, Calendar, 
+  Clock, Handshake, DollarSign, TrendingUp, 
+  ClipboardList, Star, Rocket, FileText, User, Settings 
+} from 'lucide-react'
+
 const allNavItems = [
   // Shared / Role-specific
-  { path: '/admin/dashboard',    icon: '📊', label: 'Dashboard',       roles: ['admin', 'hr'] },
-  { path: '/employee/dashboard', icon: '📊', label: 'Dashboard',       roles: ['employee'] },
-  { path: '/candidate/dashboard',icon: '📊', label: 'Dashboard',       roles: ['candidate'] },
+  { path: '/admin/dashboard',    icon: <LayoutDashboard size={18} />, label: 'Dashboard',       roles: ['admin', 'hr'] },
+  { path: '/employee/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard',       roles: ['employee'] },
+  { path: '/candidate/dashboard',icon: <LayoutDashboard size={18} />, label: 'Dashboard',       roles: ['candidate'] },
   
-  { path: '/employees',       icon: '👥', label: 'Employees',       roles: ['admin', 'hr'] },
-  { path: '/jobs',            icon: '💼', label: 'Job Postings',     roles: ['admin', 'hr'] },
-  { path: '/leaves',          icon: '🌴', label: 'Leaves',          roles: ['admin', 'hr', 'employee'] },
-  { path: '/interviews',      icon: '📅', label: 'Interviews',      roles: ['admin', 'hr', 'employee', 'candidate'] },
-  { path: '/attendance',      icon: '⏰', label: 'Attendance',      roles: ['admin', 'hr', 'employee'] },
-  { path: '/meetings',        icon: '🤝', label: 'Meetings',         roles: ['admin', 'hr', 'employee'] },
-  { path: '/payroll',         icon: '💰', label: 'Payroll',         roles: ['admin', 'hr', 'employee'] },
-  { path: '/analytics',       icon: '📈', label: 'Analytics',       roles: ['admin', 'hr'] },
-  { path: '/admin/demo-requests', icon: '📋', label: 'Demo Requests', roles: ['admin', 'hr'] },
-  { path: '/reviews',         icon: '⭐', label: 'Reviews',        roles: ['employee'] },
+  { path: '/employees',       icon: <Users size={18} />, label: 'Employees',       roles: ['admin', 'hr'] },
+  { path: '/jobs',            icon: <Briefcase size={18} />, label: 'Job Postings',     roles: ['admin', 'hr'] },
+  { path: '/leaves',          icon: <Calendar size={18} />, label: 'Leaves',          roles: ['admin', 'hr', 'employee'] },
+  { path: '/interviews',      icon: <Calendar size={18} />, label: 'Interviews',      roles: ['admin', 'hr', 'employee', 'candidate'] },
+  { path: '/attendance',      icon: <Clock size={18} />, label: 'Attendance',      roles: ['admin', 'hr', 'employee'] },
+  { path: '/meetings',        icon: <Handshake size={18} />, label: 'Meetings',         roles: ['admin', 'hr', 'employee'] },
+  { path: '/payroll',         icon: <DollarSign size={18} />, label: 'Payroll',         roles: ['admin', 'hr', 'employee'] },
+  { path: '/analytics',       icon: <TrendingUp size={18} />, label: 'Analytics',       roles: ['admin', 'hr'] },
+  { path: '/admin/demo-requests', icon: <ClipboardList size={18} />, label: 'Demo Requests', roles: ['admin', 'hr'] },
+  { path: '/reviews',         icon: <Star size={18} />, label: 'Reviews',        roles: ['employee'] },
   
   // Candidate Specific
-  { path: '/jobs/available',  icon: '🚀', label: 'Available Jobs',  roles: ['candidate'] },
-  { path: '/applications',    icon: '📝', label: 'Applied Jobs',    roles: ['candidate'] },
+  { path: '/jobs/available',  icon: <Rocket size={18} />, label: 'Available Jobs',  roles: ['candidate'] },
+  { path: '/applications',    icon: <FileText size={18} />, label: 'Applied Jobs',    roles: ['candidate'] },
   
   // Shared Bottom
-  { path: '/profile',         icon: '👤', label: 'Profile',         roles: ['admin', 'hr', 'employee', 'candidate'] },
-  { path: '/settings',        icon: '⚙️', label: 'Settings',       roles: ['admin', 'hr'] },
+  { path: '/profile',         icon: <User size={18} />, label: 'Profile',         roles: ['admin', 'hr', 'employee', 'candidate'] },
+  { path: '/settings',        icon: <Settings size={18} />, label: 'Settings',       roles: ['admin', 'hr'] },
 ]
 
 export default function Sidebar() {

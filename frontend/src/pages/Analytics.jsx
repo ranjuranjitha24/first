@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area, RadarChart, PolarGrid, PolarAngleAxis, Radar } from 'recharts';
 import { getStats } from '../services/api';
+import { StatCard } from '../components/ui/StatCard';
+import { motion } from 'framer-motion';
+import { Target, Clock, DollarSign, Heart } from 'lucide-react';
+import { PageWrapper } from '../components/ui/PageWrapper';
 
 const COLORS = ['#7c3aed', '#2563eb', '#059669', '#d97706', '#dc2626', '#0891b2', '#be185d'];
 
@@ -46,8 +50,17 @@ export default function Analytics() {
 
   if (loading) return <div className="page-content"><div className="loading-state">⏳ Analyzing recruitment data...</div></div>;
 
+  const staggerContainer = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+  };
+  const staggerItem = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+  };
+
   return (
-    <div className="page-content">
+    <PageWrapper>
       <div className="page-header">
         <div>
           <h1 className="page-title">Recruiter Analytics</h1>
@@ -58,36 +71,12 @@ export default function Analytics() {
         </div>
       </div>
 
-      <div className="stats-grid">
-        <div className="stat-card primary">
-          <div className="stat-card-glow"></div>
-          <div className="stat-info">
-            <div className="stat-value">18.4%</div>
-            <div className="stat-label">Hire-to-Offer Ratio</div>
-          </div>
-        </div>
-        <div className="stat-card success">
-          <div className="stat-card-glow"></div>
-          <div className="stat-info">
-            <div className="stat-value">22 Days</div>
-            <div className="stat-label">Avg. Time to Hire</div>
-          </div>
-        </div>
-        <div className="stat-card warning">
-          <div className="stat-card-glow"></div>
-          <div className="stat-info">
-            <div className="stat-value">$4,250</div>
-            <div className="stat-label">Cost Per Hire</div>
-          </div>
-        </div>
-        <div className="stat-card danger">
-          <div className="stat-card-glow"></div>
-          <div className="stat-info">
-            <div className="stat-value">92%</div>
-            <div className="stat-label">Candidate Satisfaction</div>
-          </div>
-        </div>
-      </div>
+      <motion.div variants={staggerContainer} initial="hidden" animate="show" className="stats-grid">
+        <motion.div variants={staggerItem}><StatCard icon={<Target size={20} />} value={18.4} label="Hire-to-Offer Ratio (%)" colorClass="primary" /></motion.div>
+        <motion.div variants={staggerItem}><StatCard icon={<Clock size={20} />} value={22} label="Avg. Time to Hire (Days)" colorClass="success" /></motion.div>
+        <motion.div variants={staggerItem}><StatCard icon={<DollarSign size={20} />} value={4250} label="Cost Per Hire ($)" colorClass="warning" /></motion.div>
+        <motion.div variants={staggerItem}><StatCard icon={<Heart size={20} />} value={92} label="Candidate Satisfaction (%)" colorClass="danger" /></motion.div>
+      </motion.div>
 
       <div className="dashboard-grid">
         <div className="card" style={{ gridColumn: 'span 2' }}>
@@ -172,6 +161,6 @@ export default function Analytics() {
           </div>
         </div>
       </div>
-    </div>
+    </PageWrapper>
   );
 }

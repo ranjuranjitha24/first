@@ -138,9 +138,13 @@ function AppShell() {
 
 // ── Root App ──────────────────────────────────────────────────────────────
 function App() {
+  useEffect(() => {
+    document.body.classList.add('dark');
+  }, []);
+
   return (
     <BrowserRouter>
-      <Toaster richColors theme="dark" position="top-right" />
+      <Toaster richColors theme="dark" position="bottom-right" offset="24px" />
       <SessionProvider>
         <Routes>
           {/* Public routes */}

@@ -2,13 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getNotifications, getPortalNotifications, getUnreadCount, markRead, markAllRead } from '../services/api'
 import { useSession } from '../context/SessionContext'
-import { Clock } from 'lucide-react'
+import { Clock, Search, Bell, LogOut, CheckCircle2, AlertTriangle, AlertCircle, Info } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function TopNav() {
   const [showNotif, setShowNotif] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [unreadCount,   setUnreadCount]   = useState(0)
-  const [toast, setToast] = useState({ show: false, msg: '', type: 'success' })
   const notifRef = useRef(null)
   const navigate = useNavigate()
 
@@ -29,12 +29,8 @@ export default function TopNav() {
       if (newCount > unreadCount && unreadCount !== 0) {
         const latest = notifRes.data.data?.[0]
         if (latest) {
-          setToast({
-            show: true,
-            msg: `🔔 ${latest.title}: ${latest.message}`,
-            type: latest.type === 'danger' ? 'danger' : 'success'
-          })
-          setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 5000)
+          if (latest.type === 'danger') toast.error(`${latest.title}: ${latest.message}`)
+          else toast.success(`${latest.title}: ${latest.message}`)
         }
       }
 
@@ -94,18 +90,8 @@ export default function TopNav() {
       )}
       
       <nav className="top-nav w-full">
-      {/* Toast notification popup */}
-      {toast.show && (
-        <div
-          className={`toast show ${toast.type}`}
-          style={{ position: 'fixed', top: 80, right: 24, zIndex: 10002, maxWidth: 400 }}
-        >
-          {toast.msg}
-        </div>
-      )}
-
       <div className="search-bar">
-        <span className="search-icon">🔍</span>
+        <span className="search-icon"><Search size={16} className="text-gray-400" /></span>
         <input type="text" placeholder="Search employees, jobs, documents…" />
       </div>
 
@@ -113,7 +99,7 @@ export default function TopNav() {
         {/* Notifications bell */}
         <div className="nav-icon-wrapper" ref={notifRef}>
           <button className="nav-icon-btn" onClick={() => setShowNotif(!showNotif)}>
-            🔔
+            <Bell size={20} className="text-gray-300" />
             {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
           </button>
 
@@ -134,7 +120,7 @@ export default function TopNav() {
                       onClick={() => handleMarkRead(n._id)}
                     >
                       <div className="notif-icon-circle">
-                        {n.type === 'success' ? '✅' : n.type === 'warning' ? '⚠️' : n.type === 'danger' ? '🚨' : 'ℹ️'}
+                        {n.type === 'success' ? <CheckCircle2 size={16} /> : n.type === 'warning' ? <AlertTriangle size={16} /> : n.type === 'danger' ? <AlertCircle size={16} /> : <Info size={16} />}
                       </div>
                       <div className="notif-content">
                         <div className="notif-title">{n.title}</div>
@@ -156,15 +142,6 @@ export default function TopNav() {
             </div>
           )}
         </div>
-
-        {/* Session logout shortcut */}
-        <button
-          className="nav-icon-btn"
-          title="Logout"
-          onClick={() => logout('manual')}
-        >
-          🚪
-        </button>
 
         {/* Profile trigger */}
         <div className="profile-trigger" onClick={() => navigate('/profile')}>

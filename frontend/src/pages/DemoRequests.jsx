@@ -82,7 +82,8 @@ export default function DemoRequests() {
       setShowModal(false)
       fetchData()
     } catch (err) {
-      toast.error("Failed to update demo request")
+      const msg = err.response?.data?.detail || "Failed to update demo request"
+      toast.error(msg)
     }
   }
 

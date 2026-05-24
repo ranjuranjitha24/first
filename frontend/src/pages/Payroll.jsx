@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getPayroll, getPayrollStats, addPayroll, updatePayroll, getCurrentUser, getEmployees } from '../services/api'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-
+import { motion } from 'framer-motion'
+import { DollarSign, CreditCard, Clock } from 'lucide-react'
+import { PageWrapper } from '../components/ui/PageWrapper'
+import { StatCard } from '../components/ui/StatCard'
 export default function Payroll() {
   const [payroll, setPayroll] = useState([])
   const [stats, setStats] = useState(null)
@@ -67,8 +70,17 @@ export default function Payroll() {
     }, 1000)
   }
 
+  const staggerContainer = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+  };
+  const staggerItem = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+  };
+
   return (
-    <div className="page-content page-fade-in">
+    <PageWrapper>
       {toast.show && <div className={`toast show ${toast.type}`} style={{ position: 'fixed', top: 24, right: 24, zIndex: 10001 }}>{toast.msg}</div>}
 
       <div className="page-header">
@@ -80,29 +92,11 @@ export default function Payroll() {
       </div>
 
       {isHR && stats && (
-        <div className="stats-grid">
-          <div className="stat-card primary">
-            <div className="stat-card-glow"></div>
-            <div className="stat-info">
-              <div className="stat-value">{formatCurrency(stats.totalExpense)}</div>
-              <div className="stat-label">Total Monthly Expense</div>
-            </div>
-          </div>
-          <div className="stat-card success">
-            <div className="stat-card-glow"></div>
-            <div className="stat-info">
-              <div className="stat-value">{formatCurrency(stats.averageSalary)}</div>
-              <div className="stat-label">Average Net Salary</div>
-            </div>
-          </div>
-          <div className="stat-card warning">
-            <div className="stat-card-glow"></div>
-            <div className="stat-info">
-              <div className="stat-value">{stats.pendingPayments}</div>
-              <div className="stat-label">Pending Payments</div>
-            </div>
-          </div>
-        </div>
+        <motion.div variants={staggerContainer} initial="hidden" animate="show" className="stats-grid">
+          <motion.div variants={staggerItem}><StatCard icon={<DollarSign size={20} />} value={stats.totalExpense} label="Total Monthly Expense (₹)" colorClass="primary" /></motion.div>
+          <motion.div variants={staggerItem}><StatCard icon={<CreditCard size={20} />} value={stats.averageSalary} label="Average Net Salary (₹)" colorClass="success" /></motion.div>
+          <motion.div variants={staggerItem}><StatCard icon={<Clock size={20} />} value={stats.pendingPayments} label="Pending Payments" colorClass="warning" /></motion.div>
+        </motion.div>
       )}
 
       <div className="dashboard-grid">
@@ -228,6 +222,6 @@ export default function Payroll() {
           </div>
         </div>
       )}
-    </div>
+    </PageWrapper>
   )
 }

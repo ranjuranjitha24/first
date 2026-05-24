@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getCurrentUser, getAttendance, getAttendanceStats, attendanceCheck } from '../services/api'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
+import { motion } from 'framer-motion'
+import { Users, LogOut, Clock, TrendingUp, CheckCircle2, Hourglass } from 'lucide-react'
+import { PageWrapper } from '../components/ui/PageWrapper'
+import { StatCard } from '../components/ui/StatCard'
 
 const COLORS = ['#10b981', '#f59e0b', '#ef4444', '#3b82f6']
 
@@ -78,8 +82,17 @@ export default function Attendance() {
   const isCheckedIn = !!myTodayRecord
   const isCheckedOut = myTodayRecord?.check_out
 
+  const staggerContainer = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+  };
+  const staggerItem = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+  };
+
   return (
-    <div className="page-content page-fade-in">
+    <PageWrapper>
       {toast.show && (
         <div className={`toast show ${toast.type} glass`} style={{ position: 'fixed', top: 24, right: 24, zIndex: 10001 }}>
           {toast.msg}
@@ -110,90 +123,22 @@ export default function Attendance() {
         )}
       </div>
 
-      <div className="stats-grid">
+      <motion.div variants={staggerContainer} initial="hidden" animate="show" className="stats-grid">
         {isHR ? (
           <>
-            <div className="stat-card success">
-              <div className="stat-card-glow"></div>
-              <div className="stat-content">
-                <div className="stat-info">
-                  <div className="stat-label">Present Today</div>
-                  <div className="stat-value">{stats.present_today || 0}</div>
-                </div>
-                <div className="stat-icon-wrapper">👥</div>
-              </div>
-            </div>
-            <div className="stat-card danger" title={stats.absent_list?.join(', ') || 'No one absent'}>
-              <div className="stat-card-glow"></div>
-              <div className="stat-content">
-                <div className="stat-info">
-                  <div className="stat-label">Absent Today</div>
-                  <div className="stat-value">{stats.absent_today || 0}</div>
-                  {isHR && stats.absent_list?.length > 0 && (
-                    <div style={{ fontSize: 10, marginTop: 4, opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 }}>
-                      {stats.absent_list.join(', ')}
-                    </div>
-                  )}
-                </div>
-                <div className="stat-icon-wrapper">🚪</div>
-              </div>
-            </div>
-            <div className="stat-card warning">
-              <div className="stat-card-glow"></div>
-              <div className="stat-content">
-                <div className="stat-info">
-                  <div className="stat-label">Late Comers</div>
-                  <div className="stat-value">{stats.late_today || 0}</div>
-                </div>
-                <div className="stat-icon-wrapper">⏰</div>
-              </div>
-            </div>
-            <div className="stat-card primary">
-              <div className="stat-card-glow"></div>
-              <div className="stat-content">
-                <div className="stat-info">
-                  <div className="stat-label">Attendance Rate</div>
-                  <div className="stat-value">{stats.attendance_percentage || 0}%</div>
-                </div>
-                <div className="stat-icon-wrapper">📈</div>
-              </div>
-            </div>
+            <motion.div variants={staggerItem}><StatCard icon={<Users size={20} />} value={stats.present_today || 0} label="Present Today" colorClass="success" /></motion.div>
+            <motion.div variants={staggerItem}><StatCard icon={<LogOut size={20} />} value={stats.absent_today || 0} label="Absent Today" colorClass="danger" /></motion.div>
+            <motion.div variants={staggerItem}><StatCard icon={<Clock size={20} />} value={stats.late_today || 0} label="Late Comers" colorClass="warning" /></motion.div>
+            <motion.div variants={staggerItem}><StatCard icon={<TrendingUp size={20} />} value={stats.attendance_percentage || 0} label="Attendance Rate (%)" colorClass="primary" /></motion.div>
           </>
         ) : (
           <>
-            <div className="stat-card success">
-              <div className="stat-card-glow"></div>
-              <div className="stat-content">
-                <div className="stat-info">
-                  <div className="stat-label">Days Present</div>
-                  <div className="stat-value">{(stats.Present || 0) + (stats.Late || 0)}</div>
-                </div>
-                <div className="stat-icon-wrapper">✅</div>
-              </div>
-            </div>
-            <div className="stat-card warning">
-              <div className="stat-card-glow"></div>
-              <div className="stat-content">
-                <div className="stat-info">
-                  <div className="stat-label">Late Logins</div>
-                  <div className="stat-value">{stats.Late || 0}</div>
-                </div>
-                <div className="stat-icon-wrapper">🕒</div>
-              </div>
-            </div>
-            <div className="stat-card primary">
-              <div className="stat-card-glow"></div>
-              <div className="stat-content">
-                <div className="stat-info">
-                  <div className="stat-label">Total Work Hours</div>
-                  <div className="stat-value">{(stats.totalHours || 0).toFixed(1)}h</div>
-                </div>
-                <div className="stat-icon-wrapper">⏳</div>
-              </div>
-            </div>
+            <motion.div variants={staggerItem}><StatCard icon={<CheckCircle2 size={20} />} value={(stats.Present || 0) + (stats.Late || 0)} label="Days Present" colorClass="success" /></motion.div>
+            <motion.div variants={staggerItem}><StatCard icon={<Clock size={20} />} value={stats.Late || 0} label="Late Logins" colorClass="warning" /></motion.div>
+            <motion.div variants={staggerItem}><StatCard icon={<Hourglass size={20} />} value={stats.totalHours || 0} label="Total Work Hours" colorClass="primary" /></motion.div>
           </>
         )}
-      </div>
+      </motion.div>
 
       <div className="dashboard-grid">
         <div className="card glass" style={{ gridColumn: 'span 2' }}>
@@ -303,6 +248,6 @@ export default function Attendance() {
           </div>
         </div>
       </div>
-    </div>
+    </PageWrapper>
   )
 }

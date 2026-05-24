@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getLeaves, addLeave, updateLeave, deleteLeave, getLeaveBalances, getLeaveStats, getCurrentUser } from '../services/api'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
-
+import { motion } from 'framer-motion'
+import { PageWrapper } from '../components/ui/PageWrapper'
+import { StatCard } from '../components/ui/StatCard'
 const LEAVE_TYPES = ['Sick', 'Casual', 'Earned', 'Unpaid', 'Paternity', 'Maternity']
 const TYPE_COLORS = { Sick: '#ef4444', Casual: '#f59e0b', Earned: '#10b981', Unpaid: '#6366f1', Paternity: '#3b82f6', Maternity: '#be185d' }
 const STATUS_COLORS = { Pending: 'warning', Approved: 'success', Rejected: 'danger' }
@@ -86,8 +88,17 @@ export default function Leaves() {
 
   const chartData = stats?.by_type?.map(t => ({ name: t._id, value: t.count })) || []
 
+  const staggerContainer = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+  };
+  const staggerItem = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+  };
+
   return (
-    <div className="page-content page-fade-in">
+    <PageWrapper>
       {toast.show && (
         <div className={`toast show ${toast.type} glass`} style={{ position: 'fixed', top: 24, right: 24, zIndex: 10001 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -110,32 +121,21 @@ export default function Leaves() {
       </div>
 
       {!isHR && (
-        <div className="stats-grid">
+        <motion.div variants={staggerContainer} initial="hidden" animate="show" className="stats-grid">
           {['Sick', 'Casual', 'Earned'].map(type => (
-            <div key={type} className={`stat-card ${type.toLowerCase() === 'sick' ? 'danger' : type.toLowerCase() === 'casual' ? 'warning' : 'success'}`}>
-              <div className="stat-card-glow"></div>
-              <div className="stat-content">
-                <div className="stat-info">
-                  <div className="stat-label">{type} Balance</div>
-                  <div className="stat-value">{balances[type] || 0}</div>
-                </div>
-                <div className="stat-icon-wrapper" style={{ fontSize: 24 }}>
-                  {type === 'Sick' ? '💊' : type === 'Casual' ? '🏖️' : '🎖️'}
-                </div>
-              </div>
-            </div>
+            <motion.div variants={staggerItem} key={type}>
+              <StatCard 
+                icon={type === 'Sick' ? '💊' : type === 'Casual' ? '🏖️' : '🎖️'} 
+                value={balances[type] || 0} 
+                label={`${type} Balance`} 
+                colorClass={type.toLowerCase() === 'sick' ? 'danger' : type.toLowerCase() === 'casual' ? 'warning' : 'success'} 
+              />
+            </motion.div>
           ))}
-          <div className="stat-card primary">
-            <div className="stat-card-glow"></div>
-            <div className="stat-content">
-              <div className="stat-info">
-                <div className="stat-label">Total Leaves Used</div>
-                <div className="stat-value">{balances.used || 0}</div>
-              </div>
-              <div className="stat-icon-wrapper" style={{ fontSize: 24 }}>📊</div>
-            </div>
-          </div>
-        </div>
+          <motion.div variants={staggerItem}>
+            <StatCard icon="📊" value={balances.used || 0} label="Total Leaves Used" colorClass="primary" />
+          </motion.div>
+        </motion.div>
       )}
 
       <div className="dashboard-grid">
@@ -354,6 +354,6 @@ export default function Leaves() {
           </div>
         </div>
       )}
-    </div>
+    </PageWrapper>
   )
 }

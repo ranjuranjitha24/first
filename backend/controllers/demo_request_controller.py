@@ -23,7 +23,9 @@ def send_demo_emails(record):
 
     try:
         # Connect to Gmail SMTP
-        server = smtplib.SMTP("smtp.gmail.com", 587)
+        print(f"Attempting to send initial demo request notifications for {record['email']}...")
+        server = smtplib.SMTP("smtp.gmail.com", 587, timeout=10)
+        server.set_debuglevel(1)
         server.starttls()
         server.login(email_user, email_pass)
 
@@ -155,7 +157,7 @@ def update_demo_request(req_id, data):
             })
             
             # Create user record
-            users_col.insert_one({
+            user_res = users_col.insert_one({
                 "username": doc["email"],
                 "email": doc["email"],
                 "password": hash_pw(temp_password),
@@ -177,17 +179,25 @@ def update_demo_request(req_id, data):
             # Send Email with credentials
             email_user = os.getenv("EMAIL_USER")
             email_pass = os.getenv("EMAIL_PASS")
-            if email_user and email_pass:
-                try:
-                    server = smtplib.SMTP("smtp.gmail.com", 587)
-                    server.starttls()
-                    server.login(email_user, email_pass)
-                    
-                    msg = MIMEMultipart()
-                    msg["From"] = email_user
-                    msg["To"] = doc["email"]
-                    msg["Subject"] = f"Your HR Recruiter Pro Demo is Ready!"
-                    body = f"""Hello {doc['name']},
+            
+            if not email_user or not email_pass:
+                employees_col.delete_one({"_id": emp_res.inserted_id})
+                users_col.delete_one({"_id": user_res.inserted_id})
+                from fastapi import HTTPException
+                raise HTTPException(status_code=500, detail="Demo approved but credential email delivery failed. SMTP credentials not configured.")
+                
+            try:
+                print(f"Attempting to send credentials email to {doc['email']}...")
+                server = smtplib.SMTP("smtp.gmail.com", 587, timeout=10)
+                server.set_debuglevel(1)  # Debug logs for SMTP
+                server.starttls()
+                server.login(email_user, email_pass)
+                
+                msg = MIMEMultipart()
+                msg["From"] = email_user
+                msg["To"] = doc["email"]
+                msg["Subject"] = f"Your HR Recruiter Pro Demo is Ready!"
+                body = f"""Hello {doc['name']},
 
 Your demo request for HR Recruiter Pro has been approved.
 
@@ -217,12 +227,22 @@ Please note:
 Thank you,
 HR Recruiter Pro Team
 """
-                    msg.attach(MIMEText(body, "plain"))
-                    server.send_message(msg)
-                    server.quit()
-                    print(f"Demo credentials sent to {doc['email']}")
-                except Exception as e:
-                    print(f"Failed to send credentials: {e}")
+                msg.attach(MIMEText(body, "plain"))
+                server.send_message(msg)
+                server.quit()
+                print(f"Demo credentials successfully sent to {doc['email']}")
+            except smtplib.SMTPAuthenticationError as e:
+                print(f"SMTP Auth Error: {e}")
+                employees_col.delete_one({"_id": emp_res.inserted_id})
+                users_col.delete_one({"_id": user_res.inserted_id})
+                from fastapi import HTTPException
+                raise HTTPException(status_code=500, detail="Demo approved but credential email delivery failed (SMTP Auth Error). Ensure App Password is used.")
+            except Exception as e:
+                print(f"SMTP Delivery Error: {e}")
+                employees_col.delete_one({"_id": emp_res.inserted_id})
+                users_col.delete_one({"_id": user_res.inserted_id})
+                from fastapi import HTTPException
+                raise HTTPException(status_code=500, detail=f"Demo approved but credential email delivery failed: {str(e)}")
 
     demo_requests_col.update_one(
         {"_id": ObjectId(req_id)},

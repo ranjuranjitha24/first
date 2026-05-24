@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { getPortalStats, getMyInterviews, getCurrentUser } from '../services/api'
-
+import { motion } from 'framer-motion'
+import { PageWrapper } from '../components/ui/PageWrapper'
+import { StatCard } from '../components/ui/StatCard'
 const HIRING_STEPS = [
   { step: 1, icon: '📄', title: 'Apply',      desc: 'Submit your resume for open roles.',         color: '#6366f1' },
   { step: 2, icon: '🔍', title: 'Screening',  desc: 'HR reviews your profile and skills.',         color: '#8b5cf6' },
@@ -29,8 +31,17 @@ export default function CandidateDashboard() {
     fetchData()
   }, [])
 
+  const staggerContainer = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+  };
+  const staggerItem = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+  };
+
   return (
-    <div className="page-content page-fade-in">
+    <PageWrapper>
 
       {/* ── Header ── */}
       <div className="page-header">
@@ -41,21 +52,17 @@ export default function CandidateDashboard() {
       </div>
 
       {/* ── Stat Cards ── */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 28 }}>
+      <motion.div variants={staggerContainer} initial="hidden" animate="show" className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 28 }}>
         {[
-          { icon: '📄', label: 'Total Applications', value: stats.totalApplications, color: '#6366f1', bg: 'rgba(99,102,241,0.12)' },
-          { icon: '⭐', label: 'Shortlisted',         value: stats.shortlisted,       color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
-          { icon: '🗓️', label: 'Upcoming Interviews', value: stats.upcomingInterviews,color: '#10b981', bg: 'rgba(16,185,129,0.12)' },
+          { icon: '📄', label: 'Total Applications', value: stats.totalApplications, colorClass: 'primary' },
+          { icon: '⭐', label: 'Shortlisted',         value: stats.shortlisted,       colorClass: 'warning' },
+          { icon: '🗓️', label: 'Upcoming Interviews', value: stats.upcomingInterviews,colorClass: 'success' },
         ].map(s => (
-          <div key={s.label} className="stat-card glass" style={{ display: 'flex', alignItems: 'center', gap: 18, padding: '22px 24px' }}>
-            <div style={{ width: 52, height: 52, borderRadius: 14, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>{s.icon}</div>
-            <div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 500 }}>{s.label}</div>
-              <div style={{ fontSize: 32, fontWeight: 800, color: s.color, lineHeight: 1 }}>{loading ? '–' : s.value}</div>
-            </div>
-          </div>
+          <motion.div variants={staggerItem} key={s.label}>
+            <StatCard icon={s.icon} label={s.label} value={loading ? 0 : s.value} colorClass={s.colorClass} />
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
 
       {/* ── Recent Interviews (full width) ── */}
       <div className="card glass" style={{ marginBottom: 28 }}>
@@ -162,7 +169,7 @@ export default function CandidateDashboard() {
         </div>
       </div>
 
-    </div>
+    </PageWrapper>
   )
 }
 

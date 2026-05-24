@@ -9,7 +9,7 @@ export function Button({
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
     padding: '10px 20px', borderRadius: 12, fontFamily: 'Inter, sans-serif',
     fontSize: 13, fontWeight: 600, transition: 'all 0.2s', cursor: disabled || loading ? 'not-allowed' : 'pointer',
-    opacity: disabled ? 0.6 : 1, outline: 'none', border: 'none', whiteSpace: 'nowrap'
+    opacity: disabled || loading ? 0.6 : 1, outline: 'none', border: 'none', whiteSpace: 'nowrap'
   }
 
   let variantStyle = {}
