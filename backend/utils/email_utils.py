@@ -43,7 +43,8 @@ def send_reset_email(to_email: str, reset_link: str) -> bool:
     url = "https://api.resend.com/emails"
     headers = {
         "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "User-Agent": "RecruiterPro-Backend/1.0"
     }
     
     data = {
